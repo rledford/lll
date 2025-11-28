@@ -534,9 +534,8 @@ levels = {
       {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
       {type = LASER_TARGET, sprites = "test", fx = 5, fy = 1}
     },
-    tools = { 
-      {type = TOOL_MIRROR, max = 3},
-      {type = TOOL_SPLIT, max = 0}
+    tools = {
+      {type = TOOL_MIRROR, max = 3}
     },
     par = 2
   },
@@ -547,9 +546,8 @@ levels = {
       {type = LASER_BLOCK, fx = 6, fy = 1},
       {type = LASER_TARGET, sprites = "test", fx = 9, fy = 5}
     },
-    tools = { 
-      {type = TOOL_MIRROR, max = 4},
-      {type = TOOL_SPLIT, max = 0}
+    tools = {
+      {type = TOOL_MIRROR, max = 4}
     },
     par = 3
   },
@@ -561,11 +559,10 @@ levels = {
       {type = LASER_TARGET, sprites = "test", fx = 5, fy = 5},
       {type = LASER_TARGET, sprites = "test", fx = 9, fy = 5}
     },
-    tools = { 
-      {type = TOOL_MIRROR, max = 5},
-      {type = TOOL_SPLIT, max = 0}
+    tools = {
+      {type = TOOL_MIRROR, max = 5}
     },
-    par = 4
+    par = 3
   },
   {
     name = "Through the Gap",
@@ -576,9 +573,8 @@ levels = {
       {type = LASER_TARGET, sprites = "test", fx = 9, fy = 3},
       {type = LASER_TARGET, sprites = "test", fx = 9, fy = 7}
     },
-    tools = { 
-      {type = TOOL_MIRROR, max = 5},
-      {type = TOOL_SPLIT, max = 0}
+    tools = {
+      {type = TOOL_MIRROR, max = 5}
     },
     par = 4
   },
@@ -597,18 +593,16 @@ levels = {
     par = 4
   },
   {
-    name = "Level 6",
+    name = "Crossroads",
     field = {
-      { type = LASER_EMIT, fx = 5, fy = 5, dx = -1, dy = -1 },
-      { type = LASER_EMIT, fx = 6, fy = 6, dx = 1, dy = 1 },
-      { type = LASER_BLOCK, sprites = "test", fx = 5, fy = 4},
-      { type = LASER_BLOCK, sprites = "test", fx = 7, fy = 6},
-      { type = LASER_BLOCK, sprites = "test", fx = 5, fy = 7},
-      { type = LASER_BLOCK, sprites = "test", fx = 5, fy = 6},
-      { type = LASER_TARGET, sprites = "test", fx = 6, fy = 4},
-      { type = LASER_TARGET, sprites = "test", fx = 5, fy = 7},
+      { type = LASER_EMIT, fx = 1, fy = 3, dx = 1, dy = 0 },
+      { type = LASER_EMIT, fx = 3, fy = 1, dx = 0, dy = 1 },
+      { type = LASER_BLOCK, fx = 6, fy = 3},
+      { type = LASER_BLOCK, fx = 3, fy = 6},
+      { type = LASER_TARGET, sprites = "test", fx = 9, fy = 1},
+      { type = LASER_TARGET, sprites = "test", fx = 1, fy = 9},
       },
-    tools = {{type = TOOL_MIRROR, max = 6}},
+    tools = {{type = TOOL_MIRROR, max = 5}},
     par = 5
   },
   {
@@ -616,16 +610,17 @@ levels = {
     field = {
       {type = LASER_EMIT, fx = 1, fy = 3, dx = 1, dy = 0},   -- East emitter
       {type = LASER_EMIT, fx = 10, fy = 7, dx = -1, dy = 0}, -- West emitter
-      {type = LASER_BLOCK, fx = 5, fy = 3},
-      {type = LASER_BLOCK, fx = 5, fy = 7},
+      {type = LASER_BLOCK, fx = 4, fy = 3},
+      {type = LASER_BLOCK, fx = 7, fy = 7},
+      {type = LASER_BLOCK, fx = 5, fy = 5},
       {type = LASER_TARGET, sprites = "test", fx = 3, fy = 1},
-      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 10}
+      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 10},
+      {type = LASER_TARGET, sprites = "test", fx = 10, fy = 5}
     },
-    tools = { 
-      {type = TOOL_MIRROR, max = 5},  -- Optimal: 4, Par: 5, Max: 6 total
-      {type = TOOL_SPLIT, max = 1}
+    tools = {
+      {type = TOOL_MIRROR, max = 7}
     },
-    par = 5
+    par = 6
   },
   {
     name = "Triple Target",
@@ -638,10 +633,9 @@ levels = {
       {type = LASER_TARGET, sprites = "test", fx = 8, fy = 8}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 6},
-      {type = TOOL_SPLIT, max = 0}
+      {type = TOOL_MIRROR, max = 6}
     },
-    par = 5
+    par = 4
   },
   {
     name = "Cross Fire",
@@ -654,8 +648,7 @@ levels = {
       {type = LASER_TARGET, sprites = "test", fx = 1, fy = 1}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 7},
-      {type = TOOL_SPLIT, max = 0}
+      {type = TOOL_MIRROR, max = 7}
     },
     par = 6
   },
@@ -663,17 +656,14 @@ levels = {
     name = "Diagonal Dance",
     field = {
       {type = LASER_EMIT, fx = 2, fy = 2, dx = 1, dy = 1},
-      {type = LASER_BLOCK, fx = 5, fy = 5},
-      {type = LASER_BLOCK, fx = 6, fy = 6},
-      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 2},
-      {type = LASER_TARGET, sprites = "test", fx = 2, fy = 9},
-      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 9}
+      {type = LASER_BLOCK, fx = 8, fy = 8},
+      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 5},
+      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 3}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 8},
-      {type = TOOL_SPLIT, max = 0}
+      {type = TOOL_MIRROR, max = 3}
     },
-    par = 6
+    par = 2
   },
   {
     name = "First Split",
@@ -715,7 +705,7 @@ levels = {
       {type = TOOL_MIRROR, max = 4},
       {type = TOOL_SPLIT, max = 2}
     },
-    par = 5
+    par = 4
   },
   {
     name = "Split Maze",
@@ -732,57 +722,57 @@ levels = {
       {type = TOOL_MIRROR, max = 5},
       {type = TOOL_SPLIT, max = 2}
     },
-    par = 6
+    par = 3
   },
   {
     name = "Double Split",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
-      {type = LASER_BLOCK, fx = 1, fy = 5},
-      {type = LASER_BLOCK, fx = 9, fy = 5},
-      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 3},
-      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 3},
-      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 7},
-      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 7}
+      {type = LASER_BLOCK, fx = 3, fy = 2},
+      {type = LASER_BLOCK, fx = 7, fy = 2},
+      {type = LASER_BLOCK, fx = 5, fy = 6},
+      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 4},
+      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 4},
+      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 8},
+      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 8}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 4},
-      {type = TOOL_SPLIT, max = 3}
+      {type = TOOL_MIRROR, max = 5},
+      {type = TOOL_SPLIT, max = 2}
     },
     par = 6
   },
   {
     name = "Cascade",
     field = {
-      {type = LASER_EMIT, fx = 1, fy = 2, dx = 1, dy = 0},
-      {type = LASER_EMIT, fx = 1, fy = 8, dx = 1, dy = 0},
-      {type = LASER_BLOCK, fx = 4, fy = 2},
-      {type = LASER_BLOCK, fx = 4, fy = 8},
-      {type = LASER_BLOCK, fx = 7, fy = 5},
-      {type = LASER_TARGET, sprites = "test", fx = 10, fy = 2},
-      {type = LASER_TARGET, sprites = "test", fx = 10, fy = 5},
-      {type = LASER_TARGET, sprites = "test", fx = 10, fy = 8}
+      {type = LASER_EMIT, fx = 1, fy = 4, dx = 1, dy = 0},
+      {type = LASER_BLOCK, fx = 4, fy = 1},
+      {type = LASER_BLOCK, fx = 4, fy = 7},
+      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 2},
+      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 4},
+      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 6}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 6},
+      {type = TOOL_MIRROR, max = 4},
       {type = TOOL_SPLIT, max = 2}
     },
-    par = 7
+    par = 4
   },
   {
     name = "Star Pattern",
     field = {
-      {type = LASER_EMIT, fx = 5, fy = 5, dx = 1, dy = 0},
+      {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
+      {type = LASER_BLOCK, fx = 5, fy = 5},
+      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 7},
+      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 7},
       {type = LASER_TARGET, sprites = "test", fx = 1, fy = 5},
-      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 5},
-      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 1},
-      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 9}
+      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 5}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 3},
-      {type = TOOL_SPLIT, max = 3}
+      {type = TOOL_MIRROR, max = 4},
+      {type = TOOL_SPLIT, max = 2}
     },
-    par = 6
+    par = 5
   },
   {
     name = "Diagonal Split",
@@ -797,7 +787,7 @@ levels = {
       {type = TOOL_MIRROR, max = 5},
       {type = TOOL_SPLIT, max = 2}
     },
-    par = 6
+    par = 5
   },
   {
     name = "Grid Lock",
@@ -817,7 +807,7 @@ levels = {
       {type = TOOL_MIRROR, max = 7},
       {type = TOOL_SPLIT, max = 3}
     },
-    par = 8
+    par = 4
   },
   {
     name = "Triple Emitter",
@@ -835,7 +825,7 @@ levels = {
       {type = TOOL_MIRROR, max = 6},
       {type = TOOL_SPLIT, max = 3}
     },
-    par = 8
+    par = 5
   },
   {
     name = "Reflection Pool",
@@ -857,7 +847,7 @@ levels = {
       {type = TOOL_MIRROR, max = 8},
       {type = TOOL_SPLIT, max = 4}
     },
-    par = 10
+    par = 5
   },
   {
     name = "Spiral",
@@ -877,7 +867,7 @@ levels = {
       {type = TOOL_MIRROR, max = 8},
       {type = TOOL_SPLIT, max = 4}
     },
-    par = 10
+    par = 4
   },
   {
     name = "Labyrinth",
@@ -901,7 +891,7 @@ levels = {
       {type = TOOL_MIRROR, max = 9},
       {type = TOOL_SPLIT, max = 5}
     },
-    par = 11
+    par = 5
   },
   {
     name = "Chamber",
@@ -924,31 +914,34 @@ levels = {
       {type = TOOL_MIRROR, max = 10},
       {type = TOOL_SPLIT, max = 5}
     },
-    par = 12
+    par = 8
   },
   {
     name = "Nexus",
     field = {
-      {type = LASER_EMIT, fx = 5, fy = 5, dx = 1, dy = 0},
-      {type = LASER_EMIT, fx = 5, fy = 5, dx = 0, dy = 1},
-      {type = LASER_BLOCK, fx = 3, fy = 3},
-      {type = LASER_BLOCK, fx = 7, fy = 3},
-      {type = LASER_BLOCK, fx = 3, fy = 7},
-      {type = LASER_BLOCK, fx = 7, fy = 7},
-      {type = LASER_TARGET, sprites = "test", fx = 1, fy = 3},
-      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 3},
-      {type = LASER_TARGET, sprites = "test", fx = 1, fy = 7},
-      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 7},
-      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 1},
+      {type = LASER_EMIT, fx = 1, fy = 2, dx = 1, dy = 0},
+      {type = LASER_EMIT, fx = 2, fy = 1, dx = 0, dy = 1},
+      {type = LASER_BLOCK, fx = 5, fy = 2},
+      {type = LASER_BLOCK, fx = 2, fy = 5},
+      {type = LASER_BLOCK, fx = 7, fy = 4},
+      {type = LASER_BLOCK, fx = 4, fy = 7},
+      {type = LASER_BLOCK, fx = 8, fy = 6},
+      {type = LASER_BLOCK, fx = 6, fy = 8},
+      {type = LASER_BLOCK, fx = 5, fy = 5},
+      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 2},
+      {type = LASER_TARGET, sprites = "test", fx = 2, fy = 9},
+      {type = LASER_TARGET, sprites = "test", fx = 9, fy = 9},
+      {type = LASER_TARGET, sprites = "test", fx = 1, fy = 1},
       {type = LASER_TARGET, sprites = "test", fx = 7, fy = 1},
-      {type = LASER_TARGET, sprites = "test", fx = 3, fy = 9},
-      {type = LASER_TARGET, sprites = "test", fx = 7, fy = 9}
+      {type = LASER_TARGET, sprites = "test", fx = 1, fy = 7},
+      {type = LASER_TARGET, sprites = "test", fx = 6, fy = 5},
+      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 6}
     },
     tools = {
-      {type = TOOL_MIRROR, max = 10},
-      {type = TOOL_SPLIT, max = 6}
+      {type = TOOL_MIRROR, max = 14},
+      {type = TOOL_SPLIT, max = 7}
     },
-    par = 13
+    par = 11
   },
   {
     name = "Master Puzzle",
