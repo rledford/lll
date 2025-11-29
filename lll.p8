@@ -6,6 +6,7 @@ __lua__
 
 EMPTY = ""
 T_SIZE = 8
+FIELD_SIZE = {10,10}
 FIELD_OFFSET = {3,3}
 TOOL_UI_OFFSET = {7,14}
 
@@ -26,6 +27,12 @@ TOOL_MIRROR = "MIRROR"
 TOOL_SPLIT = "SPLIT"
 
 CURSOR_SPRITE = 32
+STAR_FILL_SPRITE = 48
+STAR_SPRITE = 49
+
+STATE_LEVEL_SELECT = 0
+STATE_PLAYING = 1
+STATE_WIN = 2
 
 LASER_SPRITES = {
     [LASER_EMIT] = 16,
@@ -53,7 +60,8 @@ TARGET_SPRITES = {
 
 -- globals --
 
-current_level = 25
+current_state = STATE_PLAYING
+current_level = 1
 
 field = {}
 targets = {} -- fx:fy = { ... }
@@ -74,7 +82,9 @@ input = {
         just_pressed = false,
         was_pressed = false,
         down = false
-      }
+      },
+    x = false,
+    o = false
   }
 
 -- methods --
@@ -86,6 +96,16 @@ end
 
 function _update()
   update_input()
+  if current_state == STATE_PLAYING then
+    update_playing()
+  elseif current_state == STATE_WIN then
+    update_win()
+  elseif current_state == STATE_LEVEL_SELECT then
+    return
+  end
+end
+
+function update_playing()
   if input.lmb.just_pressed then
     local mx,my = unpack(input.cursor)
     local gx,gy = unpack(pos_to_grid(mx,my))
@@ -94,35 +114,58 @@ function _update()
   update_lasers()
   update_targets()
   update_ui()
+  if check_win() then
+    current_state = STATE_WIN
+  end
+end
+
+function update_win()
+  if input.x then
+    current_level = current_level + 1
+    load_level(levels[current_level])
+    current_state = STATE_PLAYING
+  end
 end
 
 function _draw()
 	cls()
+
+  if current_state == STATE_PLAYING then
+    draw_playing()
+  elseif current_state == STATE_WIN then
+    draw_playing()
+    draw_win()
+  elseif current_state == STATE_LEVEL_SELECT then
+    return
+  end
+end
+
+function draw_playing()
 	draw_field() -- should be draw_map()
   draw_laser()
   draw_targets()
-  draw_tools()
   draw_ui()
-  if check_win() then
-    rect(0,0,8,8,12)
+end
+
+function new_field()
+  local w,h = unpack(FIELD_SIZE)
+  local f = {}
+
+  for i = 1, h do
+    local r = {}
+    for j = 1, w do
+      r[j] = EMPTY
+    end
+    f[i] = r
   end
+
+  return f
 end
 
 function load_level(level_data)
   targets = {}
   tools = {}
-  field = {
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  {EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY,EMPTY},
-  }
+  field = new_field()
 
   for _, obj in ipairs(level_data.field) do
     if obj.type == LASER_TARGET then
@@ -158,6 +201,9 @@ function update_input()
     input.lmb.just_pressed = false
     input.lmb.was_pressed = false
   end
+
+  input.o = btn(4)
+  input.x = btn(5)
 end
 
 function update_targets()
@@ -183,6 +229,29 @@ function check_win()
   end
 
   return true
+end
+
+function get_star_rating()
+  local par = levels[current_level].par
+  local tools_used = 0
+
+  for i, row in ipairs(field) do
+    for j, cell in ipairs(row) do
+      if is_tool(cell) then
+        tools_used = tools_used + 1
+      end
+    end
+  end
+
+  if tools_used > par then
+    return 1
+  elseif tools_used == par then
+    return 2
+  elseif tools_used > 0 and tools_used < par then
+    return 3
+  else
+    return 0
+  end
 end
 
 function update_lasers()
@@ -283,7 +352,7 @@ function toggle_cell(gx, gy)
 end
 
 function is_tool(cell)
-  return cell != EMPTY and cell != LASER_EMIT
+  return cell != EMPTY and cell != LASER_EMIT and cell != LASER_TARGET and cell != LASER_BLOCK
 end
 
 function is_splitter(cell)
@@ -383,12 +452,9 @@ end
 
 function draw_field()
   map(0, 0, 0, 0)
-end
 
-function draw_tools()
-  local mx,my = unpack(input.cursor)
-  local gx,gy = unpack(pos_to_grid(mx,my))
   local ox,oy = unpack(FIELD_OFFSET)
+
   for i, row in ipairs(field) do
     for j, cell in ipairs(row) do
       local left = (j+ox-1)*T_SIZE
@@ -396,9 +462,6 @@ function draw_tools()
       local sprite = LASER_SPRITES[cell]
       if sprite then
         spr(sprite, left, top)
-      end
-      if j == gx and i == gy then
-        rect(left,top,left+T_SIZE,top+T_SIZE,12)
       end
     end
   end
@@ -449,8 +512,12 @@ end
 
 function draw_ui()
   local mx,my = unpack(input.cursor)
+  local ox,oy = unpack(FIELD_OFFSET)
+  local fw,fh = unpack(FIELD_SIZE)
   local tx, ty = unpack(TOOL_UI_OFFSET)
   local gx, gy = unpack(pos_to_grid(mx, my))
+
+  print(level.name, T_SIZE, T_SIZE, 2)
 
   for i, tool in ipairs(tools) do
     if tool.type != EMPTY then
@@ -463,17 +530,42 @@ function draw_ui()
 
       spr(TOOL_SPRITES[tool.type], x, y)
 
-      if selected_tool == tool.type then
-        rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
-      end
-
       if tool_gx == gx and tool_gy == gy then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 12)
+      end
+
+      if selected_tool == tool.type then
+        rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
       end
     end
   end
 
+  if gx >= 1 and gx <= fw and gy >= 1 and gy <= fh then
+    local left = (gx+ox-1)*T_SIZE
+    local top = (gy+oy-1)*T_SIZE
+    rect(left,top,left+T_SIZE,top+T_SIZE,12)
+  end
+
   spr(CURSOR_SPRITE, mx-1, my-1)
+end
+
+function draw_win()
+  local left, top = 32, 42
+  local px, py = 3, 3
+  local w, h = 64, 42
+  local rating = get_star_rating()
+
+  rectfill(left,top,left + w, top + h, 5)
+  rect(left,top,left + w, top + h, 7)
+
+  for i = 1, 3 do
+    local x, y = left + T_SIZE*1.5 + px + ((i-1) * T_SIZE) + ((i-1) * px), top + h - py - T_SIZE*3.75
+    local star = rating >= i and STAR_FILL_SPRITE or STAR_SPRITE
+    spr(star, x, y)
+  end
+
+  print("❎ continue", left + px, top + h - py - T_SIZE*1.5,7)
+	print("🅾️ select level", left + px, top + h - py - T_SIZE*0.5,7)
 end
 
 function is_mirror(cell)
@@ -529,10 +621,13 @@ end
 
 levels = {
   {
-    name = "First Reflection",
+    name = "first reflection",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
-      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 1}
+      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 1},
+      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 2},
+      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 3},
+      {type = LASER_TARGET, sprites = "test", fx = 5, fy = 4}
     },
     tools = {
       {type = TOOL_MIRROR, max = 3}
@@ -540,7 +635,7 @@ levels = {
     par = 2
   },
   {
-    name = "Around the Corner",
+    name = "around the corner",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 6, fy = 1},
@@ -552,7 +647,7 @@ levels = {
     par = 3
   },
   {
-    name = "Double Bend",
+    name = "double bend",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 6, fy = 1},
@@ -565,7 +660,7 @@ levels = {
     par = 3
   },
   {
-    name = "Through the Gap",
+    name = "through the gap",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 5, fy = 1},
@@ -579,7 +674,7 @@ levels = {
     par = 4
   },
   {
-    name = "Level 5",
+    name = "double cross",
     field = {
       { type = LASER_EMIT, fx = 1, fy = 2, dx = 1, dy = 0 },
       { type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1 },
@@ -593,7 +688,7 @@ levels = {
     par = 4
   },
   {
-    name = "Crossroads",
+    name = "crossroads",
     field = {
       { type = LASER_EMIT, fx = 1, fy = 3, dx = 1, dy = 0 },
       { type = LASER_EMIT, fx = 3, fy = 1, dx = 0, dy = 1 },
@@ -606,7 +701,7 @@ levels = {
     par = 5
   },
   {
-    name = "Double Beam Maze",
+    name = "double beam maze",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 3, dx = 1, dy = 0},   -- East emitter
       {type = LASER_EMIT, fx = 10, fy = 7, dx = -1, dy = 0}, -- West emitter
@@ -623,7 +718,7 @@ levels = {
     par = 6
   },
   {
-    name = "Triple Target",
+    name = "triple target",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 4, fy = 2},
@@ -638,7 +733,7 @@ levels = {
     par = 4
   },
   {
-    name = "Cross Fire",
+    name = "cross fire",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
@@ -653,7 +748,7 @@ levels = {
     par = 6
   },
   {
-    name = "Diagonal Dance",
+    name = "diagonal dance",
     field = {
       {type = LASER_EMIT, fx = 2, fy = 2, dx = 1, dy = 1},
       {type = LASER_BLOCK, fx = 8, fy = 8},
@@ -666,7 +761,7 @@ levels = {
     par = 2
   },
   {
-    name = "First Split",
+    name = "first split",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
       {type = LASER_TARGET, sprites = "test", fx = 3, fy = 5},
@@ -679,7 +774,7 @@ levels = {
     par = 3
   },
   {
-    name = "Split Path",
+    name = "split path",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 3, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 5, fy = 3},
@@ -693,7 +788,7 @@ levels = {
     par = 4
   },
   {
-    name = "Four Corners",
+    name = "four corners",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 5, dx = 1, dy = 0},
       {type = LASER_TARGET, sprites = "test", fx = 2, fy = 2},
@@ -708,7 +803,7 @@ levels = {
     par = 4
   },
   {
-    name = "Split Maze",
+    name = "split maze",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 10, fy = 10, dx = -1, dy = 0},
@@ -725,7 +820,7 @@ levels = {
     par = 3
   },
   {
-    name = "Double Split",
+    name = "double split",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
       {type = LASER_BLOCK, fx = 3, fy = 2},
@@ -743,7 +838,7 @@ levels = {
     par = 6
   },
   {
-    name = "Cascade",
+    name = "cascade",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 4, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 4, fy = 1},
@@ -759,7 +854,7 @@ levels = {
     par = 4
   },
   {
-    name = "Star Pattern",
+    name = "star pattern",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
       {type = LASER_BLOCK, fx = 5, fy = 5},
@@ -775,7 +870,7 @@ levels = {
     par = 5
   },
   {
-    name = "Diagonal Split",
+    name = "diagonal split",
     field = {
       {type = LASER_EMIT, fx = 3, fy = 3, dx = 1, dy = 1},
       {type = LASER_BLOCK, fx = 6, fy = 6},
@@ -790,7 +885,7 @@ levels = {
     par = 5
   },
   {
-    name = "Grid Lock",
+    name = "grid lock",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 3, fy = 3},
@@ -810,7 +905,7 @@ levels = {
     par = 4
   },
   {
-    name = "Triple Emitter",
+    name = "triple emitter",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 3, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
@@ -828,7 +923,7 @@ levels = {
     par = 5
   },
   {
-    name = "Reflection Pool",
+    name = "reflection pool",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 10, fy = 5, dx = -1, dy = 0},
@@ -850,7 +945,7 @@ levels = {
     par = 5
   },
   {
-    name = "Spiral",
+    name = "spiral",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 5, dx = 1, dy = 0},
       {type = LASER_BLOCK, fx = 4, fy = 4},
@@ -870,7 +965,7 @@ levels = {
     par = 4
   },
   {
-    name = "Labyrinth",
+    name = "labyrinth",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 10, fy = 10, dx = -1, dy = 0},
@@ -894,7 +989,7 @@ levels = {
     par = 5
   },
   {
-    name = "Chamber",
+    name = "chamber",
     field = {
       {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
       {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
@@ -917,7 +1012,7 @@ levels = {
     par = 8
   },
   {
-    name = "Nexus",
+    name = "nexus",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 2, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 2, fy = 1, dx = 0, dy = 1},
@@ -944,7 +1039,7 @@ levels = {
     par = 11
   },
   {
-    name = "Master Puzzle",
+    name = "master puzzle",
     field = {
       {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 0},
       {type = LASER_EMIT, fx = 10, fy = 1, dx = 0, dy = 1},
@@ -997,6 +1092,14 @@ __gfx__
 0808780008088080000000000000000000000000787777873babbab3000000000000000000000000000000000000000000000000000000000000000000000000
 0000800008088080000000000000000000000000788888873bb33bb3000000000000000000000000000000000000000000000000000000000000000000000000
 00000000080880800000000000000000000000007777777703300330000000000000000000000000000000000000000000000000000000000000000000000000
+000aa000000aa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00aaaa0000a00a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+aaaaaaaaaaa00aaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+aaaaaaaaa000000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0aaaaaa00a0000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0aaaaaa00a0000a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+aaaaaaaaa00aa00a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+aaa00aaaaaa00aaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __map__
 0101010101010101010101010101010100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0100000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
