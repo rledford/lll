@@ -25,6 +25,9 @@ LASER_D_SPLIT_B = "DSB"
 TOOL_RESET = "RESET"
 TOOL_MIRROR = "MIRROR"
 TOOL_SPLIT = "SPLIT"
+TOOL_BLOCK = "BLOCK"
+TOOL_TARGET = "TARGET"
+TOOL_EMIT = "EMIT"
 
 CURSOR_SPRITE = 32
 STAR_FILL_SPRITE = 48
@@ -34,6 +37,7 @@ STATE_LEVEL_SELECT = 0
 STATE_PLAYING = 1
 STATE_LEVEL_COMPLETE = 2
 STATE_WIN = 3
+STATE_LEVEL_EDIT = 4
 
 LASER_SPRITES = {
     [LASER_EMIT] = 16,
@@ -51,19 +55,22 @@ LASER_SPRITES = {
 TOOL_SPRITES = {
     [TOOL_RESET] = 33,
     [TOOL_MIRROR] = 17,
-    [TOOL_SPLIT] = 22
+    [TOOL_SPLIT] = 22,
+    [TOOL_BLOCK] = 26,
+    [TOOL_TARGET] = 50,
+    [TOOL_EMIT] = 16
   }
 
 TARGET_SPRITES = {51,52,53,54,55,56}
 
 -- globals --
 
-current_state = STATE_PLAYING
+current_state = STATE_LEVEL_EDIT
 current_level = 1
 
 field = {}
-targets = {} -- fx:fy = { ... }
-tools = {} -- type: {max, num}
+targets = {}
+tools = {}
 
 selected_tool = EMPTY
 level = {
@@ -81,6 +88,11 @@ input = {
         was_pressed = false,
         down = false
       },
+    rmb = {
+        just_pressed = false,
+        was_pressed = false,
+        down = false
+      },
     x = false,
     o = false
   }
@@ -89,17 +101,26 @@ input = {
 
 function _init()
   poke(0x5f2d, 1)
-  load_level(levels[current_level])
+  if current_state == STATE_LEVEL_EDIT then
+    load_level(init_empty_level())
+  else
+    load_level(levels[current_level])
+  end
 end
 
 function _update()
   update_input()
   if current_state == STATE_PLAYING then
     update_playing()
+    if check_win() then
+      current_state = STATE_LEVEL_COMPLETE
+    end
   elseif current_state == STATE_LEVEL_COMPLETE then
     update_level_complete()
   elseif current_state == STATE_WIN then
     update_win()
+  elseif current_state == STATE_LEVEL_EDIT then
+    update_playing()
   elseif current_state == STATE_LEVEL_SELECT then
     return
   end
@@ -111,12 +132,16 @@ function update_playing()
     local gx,gy = unpack(pos_to_grid(mx,my))
     toggle_cell(gx, gy)
   end
+
+  if input.rmb.just_pressed then
+    local mx,my = unpack(input.cursor)
+    local gx,gy = unpack(pos_to_grid(mx,my))
+    clear_cell(gx, gy)
+  end
+
   update_lasers()
   update_targets()
   update_ui()
-  if check_win() then
-    current_state = STATE_LEVEL_COMPLETE
-  end
 end
 
 function update_level_complete()
@@ -161,13 +186,15 @@ function _draw()
     draw_level_complete()
   elseif current_state == STATE_WIN then
     draw_win()
+  elseif current_state == STATE_LEVEL_EDIT then
+    draw_playing()
   elseif current_state == STATE_LEVEL_SELECT then
     return
   end
 end
 
 function draw_playing()
-	draw_field() -- should be draw_map()
+	draw_field()
   draw_laser()
   draw_targets()
   draw_ui()
@@ -196,24 +223,47 @@ function new_field()
   return f
 end
 
+function init_empty_level()
+  return {
+    name = "editor",
+    field = {},
+    tools = {},
+    par = 0
+  }
+end
+
 function load_level(level_data)
   targets = {}
   tools = {}
   field = new_field()
 
   for _, obj in ipairs(level_data.field) do
+    field[obj.fy][obj.fx] = obj
+
     if obj.type == LASER_TARGET then
-      targets[join_str(obj.fx, obj.fy)] = {fx = obj.fx, fy = obj.fy, sprites = obj.sprites, is_active = false}
+      targets[join_str(obj.fx, obj.fy)] = {
+        fx = obj.fx,
+        fy = obj.fy,
+        is_active = false
+      }
     end
-    field[obj.fy][obj.fx] = obj.type
   end
 
   for i, tool in ipairs(level_data.tools) do
     add(tools, {type = tool.type, max = tool.max, current = 0})
   end
+
+  if current_state == STATE_LEVEL_EDIT then
+    add(tools, { type = TOOL_MIRROR })
+    add(tools, { type = TOOL_SPLIT })
+    add(tools, { type = TOOL_BLOCK })
+    add(tools, { type = TOOL_TARGET })
+    add(tools, { type = TOOL_EMIT })
+  end
+
   add(tools, { type = EMPTY })
   add(tools, { type = TOOL_RESET})
-  
+
   selected_tool = selected_tool == EMPTY and tools[1].type or selected_tool
 
   level = level_data
@@ -222,7 +272,8 @@ end
 function update_input()
   local mb = stat(34)
   input.cursor = {stat(32)-1, stat(33)-1}
-  input.lmb.down = mb == 1
+  input.lmb.down = mb & 1 != 0
+  input.rmb.down = mb & 2 != 0
 
   if input.lmb.down then
     if not input.lmb.was_pressed then
@@ -234,6 +285,18 @@ function update_input()
   else
     input.lmb.just_pressed = false
     input.lmb.was_pressed = false
+  end
+
+  if input.rmb.down then
+    if not input.rmb.was_pressed then
+      input.rmb.just_pressed = true
+      input.rmb.was_pressed = true
+    else
+      input.rmb.just_pressed = false
+    end
+  else
+    input.rmb.just_pressed = false
+    input.rmb.was_pressed = false
   end
 
   input.o = btn(4)
@@ -317,7 +380,7 @@ function plot_laser(gx, gy, dx, dy)
   local x2, y2 = (gx + ox + dx - 1) * T_SIZE + T_SIZE/2, (gy + oy + dy - 1) * T_SIZE + T_SIZE/2
 
   add(laser_plot, {x1,y1,x2,y2})
-  if c != EMPTY then
+  if c != EMPTY and c != nil then
     laser_plot_tool_chain[chain_key] = true
   end
 
@@ -333,9 +396,16 @@ end
 
 function toggle_cell(gx, gy)
   local cell = get_cell(gx, gy)
-
-  if cell == nil or cell == LASER_BLOCK or cell == LASER_EMIT or cell == LASER_TARGET or selected_tool == EMPTY then
+  if cell == nil or selected_tool == EMPTY then
     return
+  end
+
+  local t = type(cell) == "table" and cell.type or cell
+
+  if current_state == STATE_PLAYING then
+    if t == LASER_BLOCK or t == LASER_EMIT or t == LASER_TARGET then
+      return
+    end
   end
 
   local new_cell = EMPTY
@@ -346,51 +416,145 @@ function toggle_cell(gx, gy)
 
   if selected_tool == TOOL_SPLIT then
     if cell == EMPTY then
-      new_cell = LASER_V_SPLIT
+      new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
       use_tool(TOOL_SPLIT)
-    elseif cell == LASER_V_SPLIT then
-      new_cell = LASER_D_SPLIT_A
-    elseif cell == LASER_D_SPLIT_A then
-      new_cell = LASER_H_SPLIT
-    elseif cell == LASER_H_SPLIT then
-      new_cell = LASER_D_SPLIT_B
+    elseif t == LASER_V_SPLIT then
+      new_cell = {type=LASER_D_SPLIT_A, fx=gx, fy=gy}
+    elseif t == LASER_D_SPLIT_A then
+      new_cell = {type=LASER_H_SPLIT, fx=gx, fy=gy}
+    elseif t == LASER_H_SPLIT then
+      new_cell = {type=LASER_D_SPLIT_B, fx=gx, fy=gy}
+    elseif t == LASER_D_SPLIT_B then
+      new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
     elseif is_mirror(cell) then
-      new_cell = LASER_V_SPLIT
+      new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
       use_tool(TOOL_SPLIT)
       restore_tool(TOOL_MIRROR)
-    else
-      new_cell = EMPTY
-      restore_tool(TOOL_SPLIT)
     end
-  else
+  elseif selected_tool == TOOL_MIRROR then
     if cell == EMPTY then
       use_tool(TOOL_MIRROR)
-      new_cell = LASER_V
-    elseif cell == LASER_V then
-      new_cell = LASER_DA
-    elseif cell == LASER_DA then
-      new_cell = LASER_H
-    elseif cell == LASER_H then
-      new_cell = LASER_DB
+      new_cell = {type=LASER_V, fx=gx, fy=gy}
+    elseif t == LASER_V then
+      new_cell = {type=LASER_DA, fx=gx, fy=gy}
+    elseif t == LASER_DA then
+      new_cell = {type=LASER_H, fx=gx, fy=gy}
+    elseif t == LASER_H then
+      new_cell = {type=LASER_DB, fx=gx, fy=gy}
+    elseif t == LASER_DB then
+      new_cell = {type=LASER_V, fx=gx, fy=gy}
     elseif is_splitter(cell) then
-      new_cell = LASER_V
+      new_cell = {type=LASER_V, fx=gx, fy=gy}
       use_tool(TOOL_MIRROR)
       restore_tool(TOOL_SPLIT)
-    else
-      new_cell = EMPTY
-      restore_tool(TOOL_MIRROR)
+    end
+  elseif selected_tool == TOOL_BLOCK then
+    if cell == EMPTY or t == LASER_BLOCK then
+      new_cell = (cell == EMPTY) and {type=LASER_BLOCK, fx=gx, fy=gy} or EMPTY
+    end
+  elseif selected_tool == TOOL_TARGET then
+    if cell == EMPTY or t == LASER_TARGET then
+      new_cell = (cell == EMPTY) and {type=LASER_TARGET, fx=gx, fy=gy} or EMPTY
+    end
+  elseif selected_tool == TOOL_EMIT then
+    if cell == EMPTY then
+      new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=0}
+    elseif t == LASER_EMIT then
+      local obj = cell
+      if obj.dx == 1 and obj.dy == 0 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=1}
+      elseif obj.dx == 1 and obj.dy == 1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=1}
+      elseif obj.dx == 0 and obj.dy == 1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=1}
+      elseif obj.dx == -1 and obj.dy == 1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=0}
+      elseif obj.dx == -1 and obj.dy == 0 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=-1}
+      elseif obj.dx == -1 and obj.dy == -1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=-1}
+      elseif obj.dx == 0 and obj.dy == -1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=-1}
+      else
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=0}
+      end
     end
   end
 
   field[gy][gx] = new_cell
+
+  if current_state == STATE_LEVEL_EDIT then
+    if cell != EMPTY and type(cell) == "table" then
+      for i, obj in ipairs(level.field) do
+        if obj.fx == gx and obj.fy == gy then
+          del(level.field, obj)
+          break
+        end
+      end
+    end
+
+    if new_cell != EMPTY then
+      add(level.field, new_cell)
+    end
+
+    local target_key = join_str(gx, gy)
+    if new_cell != EMPTY and new_cell.type == LASER_TARGET then
+      targets[target_key] = {
+        fx = gx,
+        fy = gy,
+        is_active = false
+      }
+    elseif cell != EMPTY and t == LASER_TARGET then
+      targets[target_key] = nil
+    end
+  end
+end
+
+function clear_cell(gx, gy)
+  local cell = get_cell(gx, gy)
+  if cell == nil or cell == EMPTY then
+    return
+  end
+
+  local t = type(cell) == "table" and cell.type or cell
+
+  if current_state == STATE_PLAYING then
+    if not is_tool(cell) then
+      return
+    end
+    if is_mirror(cell) then
+      restore_tool(TOOL_MIRROR)
+    elseif is_splitter(cell) then
+      restore_tool(TOOL_SPLIT)
+    end
+  end
+
+  field[gy][gx] = EMPTY
+
+  if type(cell) == "table" then
+    for i, obj in ipairs(level.field) do
+      if obj.fx == gx and obj.fy == gy then
+        del(level.field, obj)
+        break
+      end
+    end
+
+    if t == LASER_TARGET then
+      targets[join_str(gx, gy)] = nil
+    end
+  end
 end
 
 function is_tool(cell)
-  return cell != EMPTY and cell != LASER_EMIT and cell != LASER_TARGET and cell != LASER_BLOCK
+  if cell == EMPTY then return false end
+  local t = type(cell) == "table" and cell.type or cell
+  return t != LASER_EMIT and t != LASER_TARGET and t != LASER_BLOCK
 end
 
 function is_splitter(cell)
-  return cell == LASER_V_SPLIT or cell == LASER_H_SPLIT or cell == LASER_D_SPLIT_A
+  if cell == EMPTY then return false end
+  local t = type(cell) == "table" and cell.type or cell
+  return t == LASER_V_SPLIT or t == LASER_H_SPLIT or t == LASER_D_SPLIT_A or t == LASER_D_SPLIT_B
 end
 
 function get_cell(gx, gy)
@@ -402,21 +566,23 @@ function get_cell(gx, gy)
 end
 
 function reflect(dx, dy, cell)
-  if cell == LASER_BLOCK or cell == LASER_EMIT then
+  local t = type(cell) == "table" and cell.type or cell
+
+  if t == LASER_BLOCK or t == LASER_EMIT then
     return {{0,0}}
   end
 
-  if cell == LASER_V then
+  if t == LASER_V then
     if dx == 0 then
       return {{0,0}}
     end
     return {{dx * -1, dy}}
-  elseif cell == LASER_H then
+  elseif t == LASER_H then
     if dy == 0 then
       return {{0,0}}
     end
     return {{dx, dy * -1}}
-  elseif cell == LASER_DA then
+  elseif t == LASER_DA then
     if dx != 0 and dy != 0 then
       if dx == dy then
         return {{0,0}}
@@ -438,7 +604,7 @@ function reflect(dx, dy, cell)
         return {{-1, 0}}
       end
     end
-  elseif cell == LASER_DB then
+  elseif t == LASER_DB then
     if dy != 0 and dx != 0 then
       if dx == dy then
         return {{0,0}}
@@ -459,22 +625,22 @@ function reflect(dx, dy, cell)
         return {{0, 1}}
       end
     end
-  elseif cell == LASER_V_SPLIT then
+  elseif t == LASER_V_SPLIT then
     if dx == 0 then
       return {{0,0}}
     end
     return {{0,-1}, {0,1}}
-  elseif cell == LASER_H_SPLIT then
+  elseif t == LASER_H_SPLIT then
     if dy == 0 then
       return {{0,0}}
     end
     return {{-1,0}, {1,0}}
-  elseif cell == LASER_D_SPLIT_A then
+  elseif t == LASER_D_SPLIT_A then
     if (dx != 0 and dy == 0) or (dx == 0 and dy != 0) or (dx != dy) then
       return {{-1, -1}, {1,1}}
     end
     return {{0,0}}
-  elseif cell == LASER_D_SPLIT_B then
+  elseif t == LASER_D_SPLIT_B then
     if (dx != 0 and dy == 0) or (dx == 0 and dy != 0) or (dx == dy) then
       return {{-1, 1}, {1,-1}}
     end
@@ -493,7 +659,8 @@ function draw_field()
     for j, cell in ipairs(row) do
       local left = (j+ox-1)*T_SIZE
       local top = (i+oy-1)*T_SIZE
-      local sprite = LASER_SPRITES[cell]
+      local t = type(cell) == "table" and cell.type or cell
+      local sprite = LASER_SPRITES[t]
       if sprite then
         spr(sprite, left, top)
       end
@@ -526,16 +693,31 @@ function update_ui()
   end
 
   local mx, my = unpack(input.cursor)
-  local tx, ty = unpack(TOOL_UI_OFFSET)
+  local _, ty = unpack(TOOL_UI_OFFSET)
   local gx, gy = unpack(pos_to_grid(mx, my))
+
+  local tool_count = 0
+  for _, tool in ipairs(tools) do
+    if tool.type != EMPTY then
+      tool_count = tool_count + 1
+    end
+  end
+
+  local ox, oy = unpack(FIELD_OFFSET)
+  local fw, fh = unpack(FIELD_SIZE)
+  local field_center = ox + fw / 2
+  local tx = field_center - tool_count / 2
 
   for i, tool in ipairs(tools) do
     local x, y = (i-1+tx) * T_SIZE, ty * T_SIZE
-    local tool_gx, tool_gy = unpack(pos_to_grid(x,y))
 
-    if tool_gx == gx and tool_gy == gy then
+    if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
       if tool.type == TOOL_RESET then
-        load_level(level)
+        if current_state == STATE_LEVEL_EDIT then
+          load_level(init_empty_level())
+        else
+          load_level(levels[current_level])
+        end
       else
         selected_tool = tool.type
       end
@@ -547,23 +729,41 @@ function draw_ui()
   local mx,my = unpack(input.cursor)
   local ox,oy = unpack(FIELD_OFFSET)
   local fw,fh = unpack(FIELD_SIZE)
-  local tx, ty = unpack(TOOL_UI_OFFSET)
+  local _, ty = unpack(TOOL_UI_OFFSET)
   local gx, gy = unpack(pos_to_grid(mx, my))
 
   print("l"..tostr(current_level).." "..level.name, T_SIZE, T_SIZE, 2)
 
+  local tool_count = 0
+  for _, tool in ipairs(tools) do
+    if tool.type != EMPTY then
+      tool_count = tool_count + 1
+    end
+  end
+
+  local field_center = ox + fw / 2
+  local tx = field_center - tool_count / 2
+
   for i, tool in ipairs(tools) do
     if tool.type != EMPTY then
       local x, y = (i-1+tx) * T_SIZE, ty * T_SIZE
-      local tool_gx, tool_gy = unpack(pos_to_grid(x,y))
-      local text = tool.type == TOOL_RESET and "r" or tostr(tool.max - tool.current)
-      local text_color = text == "r" and 8 or 7
+      local text = ""
+      local text_color = 7
 
-      print(text, x + T_SIZE/2 - 2, y - T_SIZE/2 - 2, text_color)
+      if tool.type == TOOL_RESET then
+        text = "r"
+        text_color = 8
+      elseif tool.max then
+        text = tostr(tool.max - tool.current)
+      end
+
+      if text != "" then
+        print(text, x + T_SIZE/2 - 2, y - T_SIZE/2 - 2, text_color)
+      end
 
       spr(TOOL_SPRITES[tool.type], x, y)
 
-      if tool_gx == gx and tool_gy == gy then
+      if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 12)
       end
 
@@ -602,14 +802,16 @@ function draw_level_complete()
 end
 
 function is_mirror(cell)
-  return cell == LASER_V or cell == LASER_H or cell == LASER_DA or cell == LASER_DB
-end
-
-function is_splitter(cell)
-  return cell == LASER_V_SPLIT or cell == LASER_H_SPLIT or cell == LASER_D_SPLIT_A or cell == LASER_D_SPLIT_B
+  if cell == EMPTY then return false end
+  local t = type(cell) == "table" and cell.type or cell
+  return t == LASER_V or t == LASER_H or t == LASER_DA or t == LASER_DB
 end
 
 function remaining_tool_count(type)
+  if current_state == STATE_LEVEL_EDIT then
+    return 99
+  end
+
   for _, tool in ipairs(tools) do
     if tool.type == type then
       return tool.max - tool.current
@@ -620,7 +822,7 @@ end
 
 function use_tool(type)
   for _, tool in ipairs(tools) do
-    if tool.type == type then
+    if tool.type == type and tool.current then
       tool.current = tool.current + 1
     end
   end
@@ -628,7 +830,7 @@ end
 
 function restore_tool(type)
   for _, tool in ipairs(tools) do
-    if tool.type == type then
+    if tool.type == type and tool.current then
       tool.current = tool.current - 1
     end
   end
