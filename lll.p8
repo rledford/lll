@@ -10,6 +10,12 @@ FIELD_SIZE = {10,10}
 FIELD_OFFSET = {3,3}
 TOOL_UI_OFFSET = {7,14}
 
+SFX_UI_HOVER = 0
+SFX_UI_SELECT = 1
+SFX_PLACE_TOOL = 2
+SFX_REMOVE_TOOL = 3
+SFX_LEVEL_COMPLETE = 4
+
 LASER_EMIT = "E"
 LASER_BLOCK = "B"
 LASER_TARGET = "T"
@@ -71,6 +77,7 @@ TARGET_SPRITES = {51,52,53,54,55,56}
 current_state = STATE_MENU
 current_level = 1
 selected_menu_option = 1
+prev_menu_option = 1
 preview_level = 1
 
 field = {}
@@ -120,6 +127,7 @@ function _update()
   elseif current_state == STATE_PLAYING then
     update_playing()
     if check_win() then
+      sfx(SFX_LEVEL_COMPLETE)
       current_state = STATE_LEVEL_COMPLETE
     end
   elseif current_state == STATE_LEVEL_COMPLETE then
@@ -153,6 +161,7 @@ end
 
 function update_level_complete()
   if input.x or input.o then
+    sfx(SFX_UI_SELECT)
     if input.x and current_level == #levels then
       current_state = STATE_WIN
     else
@@ -165,6 +174,7 @@ end
 
 function update_win()
   if input.o then
+    sfx(SFX_UI_SELECT)
     current_level = 1
     selected_tool = EMPTY
     load_level(levels[current_level])
@@ -188,29 +198,37 @@ function update_menu()
     local mx, my = unpack(input.cursor)
 
     if selected_menu_option == 1 then
+      sfx(SFX_UI_SELECT)
       current_level = 1
       current_state = STATE_PLAYING
       load_level(levels[current_level])
     elseif selected_menu_option == 2 then
+      sfx(SFX_UI_SELECT)
       preview_level = current_level
       load_level(levels[preview_level])
       current_state = STATE_LEVEL_SELECT
     elseif selected_menu_option == 3 then
+      sfx(SFX_UI_SELECT)
       current_state = STATE_LEVEL_EDIT
       load_level(init_empty_level())
     end
   end
 
   local mx, my = unpack(input.cursor)
-  local menu_y = 49
+  local menu_y = 53
   local spacing = 14
 
   for i = 1, 3 do
     local y = menu_y + (i - 1) * spacing
     if my >= y and my < y + 8 then
-      selected_menu_option = i
+      if selected_menu_option != i then
+        sfx(SFX_UI_HOVER)
+        selected_menu_option = i
+      end
     end
   end
+
+  prev_menu_option = selected_menu_option
 end
 
 function update_level_select()
@@ -222,6 +240,7 @@ function update_level_select()
 
     if mx >= 4 and mx < 12 and my >= 60 and my < 68 then
       if preview_level > 1 then
+        sfx(SFX_UI_SELECT)
         preview_level = preview_level - 1
         load_level(levels[preview_level])
       end
@@ -229,18 +248,21 @@ function update_level_select()
 
     if mx >= 116 and mx < 124 and my >= 60 and my < 68 then
       if preview_level < #levels then
+        sfx(SFX_UI_SELECT)
         preview_level = preview_level + 1
         load_level(levels[preview_level])
       end
     end
 
     if mx >= 52 and mx < 76 and my >= 54 and my < 70 then
+      sfx(SFX_UI_SELECT)
       current_level = preview_level
       current_state = STATE_PLAYING
       load_level(levels[current_level])
     end
 
     if mx >= 52 and mx < 76 and my >= 2 and my < 10 then
+      sfx(SFX_UI_SELECT)
       field = {}
       targets = {}
       laser_plot = {}
@@ -254,7 +276,7 @@ end
 function draw_menu()
   map(32, 0, 0, 0)
   local menu_options = {"play", "level select", "playground"}
-  local menu_y = 49
+  local menu_y = 53
   local spacing = 14
 
   print("laser light logic", 26, 24, 7)
@@ -541,6 +563,7 @@ function toggle_cell(gx, gy)
   end
 
   local new_cell = EMPTY
+  local did_action = false
 
   if cell == EMPTY and remaining_tool_count(selected_tool) <= 0 then
     return
@@ -550,47 +573,62 @@ function toggle_cell(gx, gy)
     if cell == EMPTY then
       new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
       use_tool(TOOL_SPLIT)
+      did_action = true
     elseif t == LASER_V_SPLIT then
       new_cell = {type=LASER_D_SPLIT_A, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_D_SPLIT_A then
       new_cell = {type=LASER_H_SPLIT, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_H_SPLIT then
       new_cell = {type=LASER_D_SPLIT_B, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_D_SPLIT_B then
       new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
+      did_action = true
     elseif is_mirror(cell) then
       new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
       use_tool(TOOL_SPLIT)
       restore_tool(TOOL_MIRROR)
+      did_action = true
     end
   elseif selected_tool == TOOL_MIRROR then
     if cell == EMPTY then
       use_tool(TOOL_MIRROR)
       new_cell = {type=LASER_V, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_V then
       new_cell = {type=LASER_DA, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_DA then
       new_cell = {type=LASER_H, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_H then
       new_cell = {type=LASER_DB, fx=gx, fy=gy}
+      did_action = true
     elseif t == LASER_DB then
       new_cell = {type=LASER_V, fx=gx, fy=gy}
+      did_action = true
     elseif is_splitter(cell) then
       new_cell = {type=LASER_V, fx=gx, fy=gy}
       use_tool(TOOL_MIRROR)
       restore_tool(TOOL_SPLIT)
+      did_action = true
     end
   elseif selected_tool == TOOL_BLOCK then
     if cell == EMPTY or t == LASER_BLOCK then
       new_cell = (cell == EMPTY) and {type=LASER_BLOCK, fx=gx, fy=gy} or EMPTY
+      did_action = true
     end
   elseif selected_tool == TOOL_TARGET then
     if cell == EMPTY or t == LASER_TARGET then
       new_cell = (cell == EMPTY) and {type=LASER_TARGET, fx=gx, fy=gy} or EMPTY
+      did_action = true
     end
   elseif selected_tool == TOOL_EMIT then
     if cell == EMPTY then
       new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=0}
+      did_action = true
     elseif t == LASER_EMIT then
       local obj = cell
       if obj.dx == 1 and obj.dy == 0 then
@@ -610,7 +648,12 @@ function toggle_cell(gx, gy)
       else
         new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=0}
       end
+      did_action = true
     end
+  end
+
+  if did_action then
+    sfx(SFX_PLACE_TOOL)
   end
 
   field[gy][gx] = new_cell
@@ -661,6 +704,7 @@ function clear_cell(gx, gy)
     end
   end
 
+  sfx(SFX_REMOVE_TOOL)
   field[gy][gx] = EMPTY
 
   if type(cell) == "table" then
@@ -845,15 +889,18 @@ function update_ui()
 
     if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
       if tool.type == TOOL_RESET then
+        sfx(SFX_REMOVE_TOOL)
         if current_state == STATE_LEVEL_EDIT then
           load_level(init_empty_level())
         else
           load_level(levels[current_level])
         end
       elseif tool.type == TOOL_MENU then
+        sfx(SFX_UI_SELECT)
         current_state = STATE_MENU
         selected_menu_option = 1
       else
+        sfx(SFX_PLACE_TOOL)
         selected_tool = tool.type
       end
     end
@@ -1266,3 +1313,9 @@ __map__
 01000004040404040404040404050001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01000000000000000000000000000001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+__sfx__
+0003000023510265201d3001d300162001620022100221001c4000f0000d0000100014000130001d00012000245002000011000100000f0000e00000000000000000000000000000000000000000000000000000
+000300001a01021510260102a52000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300001271000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300000b73000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000500000f510145101951014520115101b5102051024510275102c51030520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
