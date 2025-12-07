@@ -40,6 +40,16 @@ CURSOR_SPRITE = 32
 STAR_FILL_SPRITE = 48
 STAR_SPRITE = 49
 
+-- emitter sprite IDs (counter-clockwise from north)
+LASER_EMIT_N = 40
+LASER_EMIT_NW = 41
+LASER_EMIT_W = 42
+LASER_EMIT_SW = 43
+LASER_EMIT_S = 44
+LASER_EMIT_SE = 45
+LASER_EMIT_E = 46
+LASER_EMIT_NE = 47
+
 STATE_MENU = 0
 STATE_LEVEL_SELECT = 1
 STATE_PLAYING = 2
@@ -111,12 +121,20 @@ input = {
 
 -- methods --
 
+function get_level(index)
+  return new_levels[index]
+end
+
+function get_level_count()
+  return #new_levels
+end
+
 function _init()
   poke(0x5f2d, 1)
   if current_state == STATE_LEVEL_EDIT then
     load_level(init_empty_level())
   else
-    load_level(levels[current_level])
+    load_level(get_level(current_level))
   end
 end
 
@@ -162,11 +180,11 @@ end
 function update_level_complete()
   if input.x or input.o then
     sfx(SFX_UI_SELECT)
-    if input.x and current_level == #levels then
+    if input.x and current_level == get_level_count() then
       current_state = STATE_WIN
     else
       current_level = input.x and current_level + 1 or current_level
-      load_level(levels[current_level])
+      load_level(get_level(current_level))
       current_state = STATE_PLAYING
     end
   end
@@ -177,7 +195,7 @@ function update_win()
     sfx(SFX_UI_SELECT)
     current_level = 1
     selected_tool = EMPTY
-    load_level(levels[current_level])
+    load_level(get_level(current_level))
     current_state = STATE_PLAYING
   end
 
@@ -201,11 +219,11 @@ function update_menu()
       sfx(SFX_UI_SELECT)
       current_level = 1
       current_state = STATE_PLAYING
-      load_level(levels[current_level])
+      load_level(get_level(current_level))
     elseif selected_menu_option == 2 then
       sfx(SFX_UI_SELECT)
       preview_level = current_level
-      load_level(levels[preview_level])
+      load_level(get_level(preview_level))
       current_state = STATE_LEVEL_SELECT
     elseif selected_menu_option == 3 then
       sfx(SFX_UI_SELECT)
@@ -242,15 +260,15 @@ function update_level_select()
       if preview_level > 1 then
         sfx(SFX_UI_SELECT)
         preview_level = preview_level - 1
-        load_level(levels[preview_level])
+        load_level(get_level(preview_level))
       end
     end
 
     if mx >= 116 and mx < 124 and my >= 60 and my < 68 then
-      if preview_level < #levels then
+      if preview_level < get_level_count() then
         sfx(SFX_UI_SELECT)
         preview_level = preview_level + 1
-        load_level(levels[preview_level])
+        load_level(get_level(preview_level))
       end
     end
 
@@ -258,7 +276,7 @@ function update_level_select()
       sfx(SFX_UI_SELECT)
       current_level = preview_level
       current_state = STATE_PLAYING
-      load_level(levels[current_level])
+      load_level(get_level(current_level))
     end
 
     if mx >= 52 and mx < 76 and my >= 2 and my < 10 then
@@ -345,7 +363,7 @@ function draw_level_select()
     print("<", 7, 62, 7)
   end
 
-  if preview_level < #levels then
+  if preview_level < get_level_count() then
     rectfill(116, 60, 124, 68, right_hover and 9 or 8)
     rect(116, 60, 124, 68, right_hover and 12 or 7)
     print(">", 119, 62, 7)
@@ -390,35 +408,85 @@ function load_level(level_data)
   tools = {}
   field = new_field()
 
-  for _, obj in ipairs(level_data.field) do
-    field[obj.fy][obj.fx] = obj
+  -- emitter direction mapping (counter-clockwise from north)
+  local emit_dirs = {
+    [LASER_EMIT_N] = {0, -1},   -- north
+    [LASER_EMIT_NW] = {-1, -1},  -- northwest
+    [LASER_EMIT_W] = {-1, 0},   -- west
+    [LASER_EMIT_SW] = {-1, 1},   -- southwest
+    [LASER_EMIT_S] = {0, 1},    -- south
+    [LASER_EMIT_SE] = {1, 1},    -- southeast
+    [LASER_EMIT_E] = {1, 0},    -- east
+    [LASER_EMIT_NE] = {1, -1}    -- northeast
+  }
 
-    if obj.type == LASER_TARGET then
-      targets[join_str(obj.fx, obj.fy)] = {
-        fx = obj.fx,
-        fy = obj.fy,
-        is_active = false
-      }
+  -- read from map if map coordinates are provided
+  if level_data.map_x and level_data.map_y then
+    level_data.field = {}
+
+    for fy = 1, 10 do
+      for fx = 1, 10 do
+        local tile_id = mget(level_data.map_x + fx - 1, level_data.map_y + fy - 1)
+        local obj = nil
+
+        if tile_id >= LASER_EMIT_N and tile_id <= LASER_EMIT_NE then
+          -- laser emitter
+          local dx, dy = unpack(emit_dirs[tile_id])
+          obj = {type = LASER_EMIT, fx = fx, fy = fy, dx = dx, dy = dy}
+        elseif tile_id == 50 then
+          -- target
+          obj = {type = LASER_TARGET, fx = fx, fy = fy}
+          targets[join_str(fx, fy)] = {
+            fx = fx,
+            fy = fy,
+            is_active = false
+          }
+        elseif tile_id > 0 then
+          -- block
+          obj = {type = LASER_BLOCK, fx = fx, fy = fy}
+        end
+
+        if obj then
+          field[fy][fx] = obj
+          add(level_data.field, obj)
+        end
+      end
+    end
+  else
+    -- use existing field data for old-style levels
+    for _, obj in ipairs(level_data.field) do
+      field[obj.fy][obj.fx] = obj
+
+      if obj.type == LASER_TARGET then
+        targets[join_str(obj.fx, obj.fy)] = {
+          fx = obj.fx,
+          fy = obj.fy,
+          is_active = false
+        }
+      end
     end
   end
 
-  for i, tool in ipairs(level_data.tools) do
-    add(tools, {type = tool.type, max = tool.max, current = 0})
+  -- tools is now a simple array of tool types (no max counts)
+  for _, tool_data in ipairs(level_data.tools) do
+    -- support both old format {type = ..., max = ...} and new format (just the type string)
+    local tool_type = type(tool_data) == "table" and tool_data.type or tool_data
+    add(tools, tool_type)
   end
 
   if current_state == STATE_LEVEL_EDIT then
-    add(tools, { type = TOOL_MIRROR })
-    add(tools, { type = TOOL_SPLIT })
-    add(tools, { type = TOOL_BLOCK })
-    add(tools, { type = TOOL_TARGET })
-    add(tools, { type = TOOL_EMIT })
+    add(tools, TOOL_MIRROR)
+    add(tools, TOOL_SPLIT)
+    add(tools, TOOL_BLOCK)
+    add(tools, TOOL_TARGET)
+    add(tools, TOOL_EMIT)
   end
 
-  add(tools, { type = EMPTY })
-  add(tools, { type = TOOL_RESET})
-  add(tools, { type = TOOL_MENU })
+  add(tools, EMPTY)
+  add(tools, TOOL_RESET)
+  add(tools, TOOL_MENU)
 
-  selected_tool = selected_tool == EMPTY and tools[1].type or selected_tool
+  selected_tool = selected_tool == EMPTY and tools[1] or selected_tool
 
   level = level_data
 end
@@ -483,7 +551,7 @@ function check_win()
 end
 
 function get_star_rating()
-  local par = levels[current_level].par
+  local par = get_level(current_level).par
   local tools_used = 0
 
   for i, row in ipairs(field) do
@@ -565,14 +633,9 @@ function toggle_cell(gx, gy)
   local new_cell = EMPTY
   local did_action = false
 
-  if cell == EMPTY and remaining_tool_count(selected_tool) <= 0 then
-    return
-  end
-
   if selected_tool == TOOL_SPLIT then
     if cell == EMPTY then
       new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
-      use_tool(TOOL_SPLIT)
       did_action = true
     elseif t == LASER_V_SPLIT then
       new_cell = {type=LASER_D_SPLIT_A, fx=gx, fy=gy}
@@ -588,13 +651,10 @@ function toggle_cell(gx, gy)
       did_action = true
     elseif is_mirror(cell) then
       new_cell = {type=LASER_V_SPLIT, fx=gx, fy=gy}
-      use_tool(TOOL_SPLIT)
-      restore_tool(TOOL_MIRROR)
       did_action = true
     end
   elseif selected_tool == TOOL_MIRROR then
     if cell == EMPTY then
-      use_tool(TOOL_MIRROR)
       new_cell = {type=LASER_V, fx=gx, fy=gy}
       did_action = true
     elseif t == LASER_V then
@@ -611,8 +671,6 @@ function toggle_cell(gx, gy)
       did_action = true
     elseif is_splitter(cell) then
       new_cell = {type=LASER_V, fx=gx, fy=gy}
-      use_tool(TOOL_MIRROR)
-      restore_tool(TOOL_SPLIT)
       did_action = true
     end
   elseif selected_tool == TOOL_BLOCK then
@@ -627,26 +685,29 @@ function toggle_cell(gx, gy)
     end
   elseif selected_tool == TOOL_EMIT then
     if cell == EMPTY then
-      new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=0}
+      new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=-1}
       did_action = true
     elseif t == LASER_EMIT then
       local obj = cell
-      if obj.dx == 1 and obj.dy == 0 then
-        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=1}
-      elseif obj.dx == 1 and obj.dy == 1 then
-        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=1}
-      elseif obj.dx == 0 and obj.dy == 1 then
-        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=1}
-      elseif obj.dx == -1 and obj.dy == 1 then
-        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=0}
-      elseif obj.dx == -1 and obj.dy == 0 then
+      -- rotate counter-clockwise: N ヌ●★ NW ヌ●★ W ヌ●★ SW ヌ●★ S ヌ●★ SE ヌ●★ E ヌ●★ NE ヌ●★ N
+      if obj.dx == 0 and obj.dy == -1 then
         new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=-1}
       elseif obj.dx == -1 and obj.dy == -1 then
-        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=-1}
-      elseif obj.dx == 0 and obj.dy == -1 then
-        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=-1}
-      else
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=0}
+      elseif obj.dx == -1 and obj.dy == 0 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=1}
+      elseif obj.dx == -1 and obj.dy == 1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=1}
+      elseif obj.dx == 0 and obj.dy == 1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=1}
+      elseif obj.dx == 1 and obj.dy == 1 then
         new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=0}
+      elseif obj.dx == 1 and obj.dy == 0 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=1, dy=-1}
+      elseif obj.dx == 1 and obj.dy == -1 then
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=-1}
+      else
+        new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=0, dy=-1}
       end
       did_action = true
     end
@@ -696,11 +757,6 @@ function clear_cell(gx, gy)
   if current_state == STATE_PLAYING then
     if not is_tool(cell) then
       return
-    end
-    if is_mirror(cell) then
-      restore_tool(TOOL_MIRROR)
-    elseif is_splitter(cell) then
-      restore_tool(TOOL_SPLIT)
     end
   end
 
@@ -827,18 +883,40 @@ function reflect(dx, dy, cell)
 end
 
 function draw_field()
-  map(0, 0, 0, 0)
-
   local ox,oy = unpack(FIELD_OFFSET)
 
-  for i, row in ipairs(field) do
-    for j, cell in ipairs(row) do
-      local left = (j+ox-1)*T_SIZE
-      local top = (i+oy-1)*T_SIZE
-      local t = type(cell) == "table" and cell.type or cell
-      local sprite = LASER_SPRITES[t]
-      if sprite then
-        spr(sprite, left, top)
+  -- draw the 16x16 background map
+  map(0, 0, 0, 0, 16, 16)
+
+  -- draw level map background if map coordinates are defined
+  if level.map_x and level.map_y then
+    map(level.map_x, level.map_y, ox * T_SIZE, oy * T_SIZE, 10, 10)
+
+    -- for map-based levels, only draw placed tools (mirrors/splitters)
+    for i, row in ipairs(field) do
+      for j, cell in ipairs(row) do
+        if is_tool(cell) then
+          local left = (j+ox-1)*T_SIZE
+          local top = (i+oy-1)*T_SIZE
+          local t = type(cell) == "table" and cell.type or cell
+          local sprite = LASER_SPRITES[t]
+          if sprite then
+            spr(sprite, left, top)
+          end
+        end
+      end
+    end
+  else
+    -- for old-style levels, draw all field objects
+    for i, row in ipairs(field) do
+      for j, cell in ipairs(row) do
+        local left = (j+ox-1)*T_SIZE
+        local top = (i+oy-1)*T_SIZE
+        local t = type(cell) == "table" and cell.type or cell
+        local sprite = LASER_SPRITES[t]
+        if sprite then
+          spr(sprite, left, top)
+        end
       end
     end
   end
@@ -874,7 +952,7 @@ function update_ui()
 
   local tool_count = 0
   for _, tool in ipairs(tools) do
-    if tool.type != EMPTY then
+    if tool != EMPTY then
       tool_count = tool_count + 1
     end
   end
@@ -888,20 +966,20 @@ function update_ui()
     local x, y = (i-1+tx) * T_SIZE, ty * T_SIZE
 
     if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
-      if tool.type == TOOL_RESET then
+      if tool == TOOL_RESET then
         sfx(SFX_REMOVE_TOOL)
         if current_state == STATE_LEVEL_EDIT then
           load_level(init_empty_level())
         else
-          load_level(levels[current_level])
+          load_level(get_level(current_level))
         end
-      elseif tool.type == TOOL_MENU then
+      elseif tool == TOOL_MENU then
         sfx(SFX_UI_SELECT)
         current_state = STATE_MENU
         selected_menu_option = 1
       else
         sfx(SFX_PLACE_TOOL)
-        selected_tool = tool.type
+        selected_tool = tool
       end
     end
   end
@@ -918,7 +996,7 @@ function draw_ui()
 
   local tool_count = 0
   for _, tool in ipairs(tools) do
-    if tool.type != EMPTY then
+    if tool != EMPTY then
       tool_count = tool_count + 1
     end
   end
@@ -927,32 +1005,30 @@ function draw_ui()
   local tx = field_center - tool_count / 2
 
   for i, tool in ipairs(tools) do
-    if tool.type != EMPTY then
+    if tool != EMPTY then
       local x, y = (i-1+tx) * T_SIZE, ty * T_SIZE
       local text = ""
       local text_color = 7
 
-      if tool.type == TOOL_RESET then
+      if tool == TOOL_RESET then
         text = "r"
         text_color = 8
-      elseif tool.type == TOOL_MENU then
+      elseif tool == TOOL_MENU then
         text = "m"
         text_color = 1
-      elseif tool.max then
-        text = tostr(tool.max - tool.current)
       end
 
       if text != "" then
         print(text, x + T_SIZE/2 - 2, y - T_SIZE/2 - 2, text_color)
       end
 
-      spr(TOOL_SPRITES[tool.type], x, y)
+      spr(TOOL_SPRITES[tool], x, y)
 
       if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 12)
       end
 
-      if selected_tool == tool.type then
+      if selected_tool == tool then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
       end
     end
@@ -992,35 +1068,6 @@ function is_mirror(cell)
   return t == LASER_V or t == LASER_H or t == LASER_DA or t == LASER_DB
 end
 
-function remaining_tool_count(type)
-  if current_state == STATE_LEVEL_EDIT then
-    return 99
-  end
-
-  for _, tool in ipairs(tools) do
-    if tool.type == type then
-      return tool.max - tool.current
-    end
-  end
-  return 0
-end
-
-function use_tool(type)
-  for _, tool in ipairs(tools) do
-    if tool.type == type and tool.current then
-      tool.current = tool.current + 1
-    end
-  end
-end
-
-function restore_tool(type)
-  for _, tool in ipairs(tools) do
-    if tool.type == type and tool.current then
-      tool.current = tool.current - 1
-    end
-  end
-end
-
 function pos_to_grid(x, y)
   return {flr(x/T_SIZE) - FIELD_OFFSET[1] + 1, flr(y/T_SIZE) - FIELD_OFFSET[2] + 1}
 end
@@ -1039,255 +1086,52 @@ function join_str(...)
   return result
 end
 
-levels = {
-   {
-    name = "cane",
-    field = {
-      {type = LASER_EMIT, fx = 3, fy = 1, dx = 0, dy = 1},
-      {type = LASER_BLOCK, fx = 4, fy = 4},
-      {type = LASER_BLOCK, fx = 5, fy = 3},
-      {type = LASER_BLOCK, fx = 7, fy = 4},
-      {type = LASER_BLOCK, fx = 7, fy = 6},
-      {type = LASER_BLOCK, fx = 7, fy = 8},
-      {type = LASER_TARGET, fx = 6, fy = 3},
-      {type = LASER_TARGET, fx = 7, fy = 5},
-      {type = LASER_TARGET, fx = 7, fy = 7},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 7},
-    },
-    par = 5
+-- old levels array removed to save memory
+-- all levels are now map-based in new_levels
+levels = {}
+
+new_levels = {
+  {
+    name = "star",
+    par = 6,
+    map_x = 0,
+    map_y = 16,
+    tools = {TOOL_MIRROR, TOOL_SPLIT}
   },
   {
-    name = "box",
-    field = {
-      {type = LASER_EMIT, fx = 2, fy = 2, dx = 1, dy = 0},
-      {type = LASER_BLOCK, fx = 4, fy = 3},
-      {type = LASER_BLOCK, fx = 6, fy = 3},
-      {type = LASER_BLOCK, fx = 7, fy = 3},
-      {type = LASER_BLOCK, fx = 8, fy = 3},
-      {type = LASER_BLOCK, fx = 4, fy = 4},
-      {type = LASER_BLOCK, fx = 4, fy = 6},
-      {type = LASER_BLOCK, fx = 4, fy = 7},
-      {type = LASER_BLOCK, fx = 4, fy = 8},
-      {type = LASER_BLOCK, fx = 8, fy = 4},
-      {type = LASER_BLOCK, fx = 8, fy = 5},
-      {type = LASER_BLOCK, fx = 8, fy = 6},
-      {type = LASER_BLOCK, fx = 8, fy = 7},
-      {type = LASER_BLOCK, fx = 8, fy = 8},
-      {type = LASER_BLOCK, fx = 4, fy = 8},
-      {type = LASER_BLOCK, fx = 5, fy = 8},
-      {type = LASER_BLOCK, fx = 6, fy = 8},
-      {type = LASER_BLOCK, fx = 7, fy = 8},
-      {type = LASER_TARGET, fx = 5, fy = 5},
-      {type = LASER_TARGET, fx = 6, fy = 5},
-      {type = LASER_TARGET, fx = 6, fy = 6},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 5},
-    },
-    par = 4
-  },
-  {
-    name = "bow",
-    field = {
-      {type = LASER_EMIT, fx = 1, fy = 1, dx = 1, dy = 1},
-      {type = LASER_BLOCK, fx = 2, fy = 8},
-      {type = LASER_BLOCK, fx = 8, fy = 2},
-      {type = LASER_TARGET, fx = 4, fy = 4},
-      {type = LASER_TARGET, fx = 2, fy = 6},
-      {type = LASER_TARGET, fx = 6, fy = 2},
-      {type = LASER_TARGET, fx = 6, fy = 6},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 6},
-    },
-    par = 5
-  },
-  {
-    name = "bell",
-    field = {
-      {type = LASER_EMIT, fx = 5, fy = 1, dx = 0, dy = 1},
-      {type = LASER_BLOCK, fx = 3, fy = 3},
-      {type = LASER_BLOCK, fx = 4, fy = 3},
-      {type = LASER_BLOCK, fx = 6, fy = 3},
-      {type = LASER_BLOCK, fx = 7, fy = 3},
-      {type = LASER_BLOCK, fx = 3, fy = 4},
-      {type = LASER_BLOCK, fx = 3, fy = 5},
-      {type = LASER_BLOCK, fx = 7, fy = 4},
-      {type = LASER_BLOCK, fx = 3, fy = 6},
-      {type = LASER_BLOCK, fx = 7, fy = 5},
-      {type = LASER_BLOCK, fx = 7, fy = 6},
-      {type = LASER_BLOCK, fx = 4, fy = 7},
-      {type = LASER_BLOCK, fx = 6, fy = 7},
-      {type = LASER_TARGET, fx = 4, fy = 5},
-      {type = LASER_TARGET, fx = 6, fy = 5},
-      {type = LASER_TARGET, fx = 5, fy = 8},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 8},
-    },
-    par = 6
-  },
-  {
-    name = "candle",
-    field = {
-      {type = LASER_EMIT, fx = 5, fy = 4, dx = 0, dy = -1},
-      {type = LASER_BLOCK, fx = 5, fy = 5},
-      {type = LASER_BLOCK, fx = 5, fy = 6},
-      {type = LASER_BLOCK, fx = 5, fy = 7},
-      {type = LASER_BLOCK, fx = 5, fy = 8},
-      {type = LASER_TARGET, fx = 5, fy = 2},
-      {type = LASER_TARGET, fx = 4, fy = 4},
-      {type = LASER_TARGET, fx = 6, fy = 4},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 5},
-      {type = TOOL_SPLIT, max = 2}
-    },
-    par = 4
-  },
-  {
-    name = "stocking",
-    field = {
-      {type = LASER_EMIT, fx = 1, fy = 6, dx = 1, dy = 0},
-      {type = LASER_BLOCK, fx = 4, fy = 2},
-      {type = LASER_TARGET, fx = 5, fy = 2},
-      {type = LASER_TARGET, fx = 6, fy = 2},
-      {type = LASER_TARGET, fx = 4, fy = 6},
-      {type = LASER_TARGET, fx = 4, fy = 7},
-      {type = LASER_TARGET, fx = 5, fy = 8},
-      {type = LASER_TARGET, fx = 6, fy = 8},
-      {type = LASER_BLOCK, fx = 7, fy = 8},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 5},
-      {type = TOOL_SPLIT, max = 2}
-    },
-    par = 4
-  },
-  {
-    name = "skate",
-    field = {
-      {type = LASER_EMIT, fx = 1, fy = 5, dx = 1, dy = 0},
-      {type = LASER_TARGET, fx = 5, fy = 2},
-      {type = LASER_TARGET, fx = 6, fy = 3},
-      {type = LASER_TARGET, fx = 7, fy = 4},
-      {type = LASER_BLOCK, fx = 5, fy = 6},
-      {type = LASER_BLOCK, fx = 6, fy = 6},
-      {type = LASER_BLOCK, fx = 7, fy = 6},
-      {type = LASER_BLOCK, fx = 8, fy = 6},
-      {type = LASER_TARGET, fx = 5, fy = 7},
-      {type = LASER_TARGET, fx = 6, fy = 7},
-      {type = LASER_TARGET, fx = 3, fy = 7},
-      {type = LASER_BLOCK, fx = 2, fy = 7},
-      {type = LASER_BLOCK, fx = 7, fy = 7},
-      {type = LASER_TARGET, fx = 8, fy = 7},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 5},
-      {type = TOOL_SPLIT, max = 3}
-    },
-    par = 6
-  },
-  {
-    name = "snowflake",
-    field = {
-      {type = LASER_EMIT, fx = 2, fy = 2, dx = 1, dy = 1},
-      {type = LASER_BLOCK, fx = 5, fy = 3},
-      {type = LASER_BLOCK, fx = 4, fy = 5},
-      {type = LASER_BLOCK, fx = 6, fy = 5},
-      {type = LASER_BLOCK, fx = 5, fy = 7},
-      {type = LASER_TARGET, fx = 4, fy = 4},
-      {type = LASER_TARGET, fx = 7, fy = 3},
-      {type = LASER_TARGET, fx = 8, fy = 2},
-      {type = LASER_TARGET, fx = 3, fy = 7},
-      {type = LASER_TARGET, fx = 2, fy = 8},
-      {type = LASER_TARGET, fx = 6, fy = 6},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 4},
-      {type = TOOL_SPLIT, max = 2}
-    },
-    par = 3
-  },
-  {
-    name = "spectacles",
-    field = {
-      {type = LASER_EMIT, fx = 6, fy = 1, dx = 0, dy = 1},
-      {type = LASER_BLOCK, fx = 2, fy = 6},
-      {type = LASER_BLOCK, fx = 6, fy = 3},
-      {type = LASER_BLOCK, fx = 5, fy = 4},
-      {type = LASER_BLOCK, fx = 7, fy = 4},
-      {type = LASER_BLOCK, fx = 9, fy = 6},
-      {type = LASER_TARGET, fx = 3, fy = 4},
-      {type = LASER_TARGET, fx = 5, fy = 6},
-      {type = LASER_TARGET, fx = 9, fy = 4},
-      {type = LASER_TARGET, fx = 7, fy = 6},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 6},
-      {type = TOOL_SPLIT, max = 2}
-    },
-    par = 4
-  },
-  {
-    name = "the tree",
-    field = {
-      {type = LASER_EMIT, fx = 1, fy = 8, dx = 1, dy = -1},
-      {type = LASER_EMIT, fx = 9, fy = 8, dx = -1, dy = -1},
-      {type = LASER_BLOCK, fx = 2, fy = 4},
-      {type = LASER_BLOCK, fx = 8, fy = 4},
-      {type = LASER_BLOCK, fx = 5, fy = 1},
-      {type = LASER_BLOCK, fx = 5, fy = 5},
-      {type = LASER_BLOCK, fx = 4, fy = 2},
-      {type = LASER_BLOCK, fx = 6, fy = 2},
-      {type = LASER_BLOCK, fx = 3, fy = 4},
-      {type = LASER_BLOCK, fx = 7, fy = 4},
-      {type = LASER_BLOCK, fx = 2, fy = 6},
-      {type = LASER_BLOCK, fx = 8, fy = 6},
-      {type = LASER_BLOCK, fx = 4, fy = 9},
-      {type = LASER_BLOCK, fx = 6, fy = 9},
-      {type = LASER_TARGET, fx = 3, fy = 3},
-      {type = LASER_TARGET, fx = 7, fy = 3},
-      {type = LASER_TARGET, fx = 2, fy = 5},
-      {type = LASER_TARGET, fx = 8, fy = 5},
-      {type = LASER_TARGET, fx = 4, fy = 7},
-      {type = LASER_TARGET, fx = 6, fy = 7},
-    },
-    tools = {
-      {type = TOOL_MIRROR, max = 6},
-      {type = TOOL_SPLIT, max = 4}
-    },
-    par = 5
+    name = "strings",
+    par = 7,
+    map_x = 10,
+    map_y = 16,
+    tools = {TOOL_MIRROR, TOOL_SPLIT}
   }
-  }
+}
 
 __gfx__
 00000000000000001111111110000000111111111000000000000000000000000000000000000000000000000000000000000000000000000777777070707007
-00000000011111101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000070707707070707707777770
-00700700011001101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000070000007707770707700777
-00077000010110101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000707077777777077070
-00077000010110101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000070000007777770707077077
-00700700011001101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000707077707777700770
-00000000011111101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000077070707707070707777770
+00000000011111101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000007070707707777770
+00700700011001101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000007707770707700777
+00077000010110101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000007077777777077070
+00077000010110101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000007777770707077077
+00700700011001101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000007077707777700770
+00000000011111101000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000007707070707777770
 00000000000000001000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000777777070070707
-00000000000cc00000000000cc000000000000cc06600660005cc500000000000c500000000005c0000330000000000000000000000005880000000000000000
-00011100000cc00000000000ccc0000000000ccc65566556005c550000000000cc500000000005cc005335000000000000000000000055580000000000000000
-00111110000cc000000000000ccc00000000ccc065755756000c50005505505555c5500000055c55003333000000000000000000000555550005500000000000
-011ccc11000cc000cccccccc00ccc000000ccc0006577560005cc500c55ccccc005cc500005cc500053333500000000000000000005885000058850000000000
-011ccc11000cc000cccccccc000ccc0000ccc00006577560005cc500ccccc55c005cc500005cc500033333300000000000000000005885000558855000000000
-00111110000cc000000000000000ccc00ccc0000657557560005c0005505505500055c5555c55000533333350000000000000000000555555555555500000000
-00011100000cc0000000000000000cccccc00000655665560055c50000000000000005cccc500000533333350000000000000000000055588550055800000000
-00111110000cc00000000000000000cccc00000006600660005cc50000000000000005c00c500000333333330000000000000000000005888850058800000000
-08888000008888880000000000000000000000000000000003300330000000000000000000000000000000000000000000000000000000000000000000000000
-8777780088807008000000000000000000000000000000003bb33bb3000000000000000000000000000000000000000000000000000000000000000000000000
-8777800080070700011111100000000000000000000000003babbab3000000000000000000000000000000000000000000000000000000000000000000000000
-87777800080880800000000000000000000000000000000003baab30000000000000000000000000000000000000000000000000000000000000000000000000
-87877780080880800111111000000000000000000000000003baab30000000000000000000000000000000000000000000000000000000000000000000000000
-0808780008088080000000000000000000000000000000003babbab3000000000000000000000000000000000000000000000000000000000000000000000000
-0000800008088080011111100000000000000000000000003bb33bb3000000000000000000000000000000000000000000000000000000000000000000000000
-00000000080880800000000000000000000000000000000003300330000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000cc00000000000cc000000000000cc00000000005cc500000000000c500000000005c0000000000044440000000000000000000000000000000055
+00011100000cc00000000000ccc0000000000ccc00000000005c550000000000cc500000000005cc0003300004ffff4000000000000000000000000000666655
+00111110000cc000000000000ccc00000000ccc000000000000c50005505505555c5500000055c55006336004fff4ff400000000000000000000000006111165
+011ccc11000cc000cccccccc00ccc000000ccc0000000000005cc500c55ccccc005cc500005cc500003333004f4ff4f400000000000000000000000061111116
+011ccc11000cc000cccccccc000ccc0000ccc00000000000005cc500ccccc55c005cc500005cc500063333604ffffff4000000000000000000000000d111111d
+00111110000cc000000000000000ccc00ccc0000000000000005c0005505505500055c5555c55000033333304ff44ff4000000000000000000000000d116611d
+00011100000cc0000000000000000cccccc00000000000000055c50000000000000005cccc5000006333333604ffff40000000000000000000000000d115511d
+00111110000cc00000000000000000cccc00000000000000005cc50000000000000005c00c5000003333333300444400000000000000000000000000ddd55ddd
+08888000008888880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+87777800888070080000000000000000000000000000000000000000000000000001c10000011100000111000001110000011100000111000001110000011100
+87778000800707000111111000000000000000000000000000000000000000000011111000c111100011111000111110001111100011111000111110001111c0
+8777780008088080000000000000000000000000000000000000000000000000011ccc11011ccc11011ccc11011ccc11011ccc11011ccc11011ccc11011ccc11
+8787778008088080011111100000000000000000000000000000000000000000011ccc11011ccc110c1ccc11011ccc11011ccc11011ccc11011cccc1011ccc11
+080878000808808000000000000000000000000000000000000000000000000000111110001111100011111000c111100011c110001111c00011111000111110
+00008000080880800111111000000000000000000000000000000000000000000001110000011100000111000001110000011100000111000001110000011100
+00000000080880800000000000000000000000000000000000000000000000000011111000111110001111100011111000111110001111100011111000111110
 000aa000000aa00000077000000aa000000aa000000aa000000aa000000aa000000aa00000000000000000000000000000000000000000000000000000000000
 00aaaa0000a00a0000066000000cc000000ff00000033000000ee000000990000008800000000000000000000000000000000000000000000000000000000000
 aaaaaaaaaaa00aaa0065560000c33c0000f99f00003bb30000e88e00009ff900008aa80000000000000000000000000000000000000000000000000000000000
@@ -1313,6 +1157,16 @@ __map__
 01000004040404040404040404050001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01000000000000000000000000000001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000000000000000000000000000000002b010000000000000000010100000000000000000101000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001a1a00001a1a000000001a001a001a001a001a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000032003200001a001a001a001a001a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00001a002c2c32001a0000323232323232323232000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000003200321a001a1a1a001a001a1a1a1a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001a00323200000000001a1a1a1a001a001a1a1a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001a000032001a001a0032323232323232323200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000320000001a001a00001a001a001a001a001a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001a00000000000000001a001a001a001a001a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+320000000000000000002f000000000000000000010000000000000000010100000000000000000101000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
 0003000023510265201d3001d300162001620022100221001c4000f0000d0000100014000130001d00012000245002000011000100000f0000e00000000000000000000000000000000000000000000000000000
 000300001a01021510260102a52000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
