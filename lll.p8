@@ -122,11 +122,11 @@ input = {
 -- methods --
 
 function get_level(index)
-  return new_levels[index]
+  return levels[index]
 end
 
 function get_level_count()
-  return #new_levels
+  return #levels
 end
 
 function _init()
@@ -316,7 +316,9 @@ function _draw()
   elseif current_state == STATE_PLAYING then
     draw_playing()
   elseif current_state == STATE_LEVEL_COMPLETE then
-    draw_playing()
+    draw_field()
+    draw_laser()
+    draw_targets()
     draw_level_complete()
   elseif current_state == STATE_WIN then
     draw_win()
@@ -328,6 +330,7 @@ function _draw()
 end
 
 function draw_playing()
+  draw_map_background()
 	draw_field()
   draw_laser()
   draw_targets()
@@ -408,7 +411,6 @@ function load_level(level_data)
   tools = {}
   field = new_field()
 
-  -- emitter direction mapping (counter-clockwise from north)
   local emit_dirs = {
     [LASER_EMIT_N] = {0, -1},   -- north
     [LASER_EMIT_NW] = {-1, -1},  -- northwest
@@ -420,7 +422,6 @@ function load_level(level_data)
     [LASER_EMIT_NE] = {1, -1}    -- northeast
   }
 
-  -- read from map if map coordinates are provided
   if level_data.map_x and level_data.map_y then
     level_data.field = {}
 
@@ -430,11 +431,9 @@ function load_level(level_data)
         local obj = nil
 
         if tile_id >= LASER_EMIT_N and tile_id <= LASER_EMIT_NE then
-          -- laser emitter
           local dx, dy = unpack(emit_dirs[tile_id])
           obj = {type = LASER_EMIT, fx = fx, fy = fy, dx = dx, dy = dy}
         elseif tile_id == 50 then
-          -- target
           obj = {type = LASER_TARGET, fx = fx, fy = fy}
           targets[join_str(fx, fy)] = {
             fx = fx,
@@ -442,7 +441,6 @@ function load_level(level_data)
             is_active = false
           }
         elseif tile_id > 0 then
-          -- block
           obj = {type = LASER_BLOCK, fx = fx, fy = fy}
         end
 
@@ -453,7 +451,6 @@ function load_level(level_data)
       end
     end
   else
-    -- use existing field data for old-style levels
     for _, obj in ipairs(level_data.field) do
       field[obj.fy][obj.fx] = obj
 
@@ -467,9 +464,7 @@ function load_level(level_data)
     end
   end
 
-  -- tools is now a simple array of tool types (no max counts)
   for _, tool_data in ipairs(level_data.tools) do
-    -- support both old format {type = ..., max = ...} and new format (just the type string)
     local tool_type = type(tool_data) == "table" and tool_data.type or tool_data
     add(tools, tool_type)
   end
@@ -689,7 +684,6 @@ function toggle_cell(gx, gy)
       did_action = true
     elseif t == LASER_EMIT then
       local obj = cell
-      -- rotate counter-clockwise: N ヌ●★ NW ヌ●★ W ヌ●★ SW ヌ●★ S ヌ●★ SE ヌ●★ E ヌ●★ NE ヌ●★ N
       if obj.dx == 0 and obj.dy == -1 then
         new_cell = {type=LASER_EMIT, fx=gx, fy=gy, dx=-1, dy=-1}
       elseif obj.dx == -1 and obj.dy == -1 then
@@ -882,17 +876,20 @@ function reflect(dx, dy, cell)
   end
 end
 
+function draw_map_background()
+  map(0, 0, 0, 0, 16, 16)
+end
+
+function draw_level_name()
+  print("l"..tostr(current_level).." "..level.name, T_SIZE, T_SIZE, 2)
+end
+
 function draw_field()
   local ox,oy = unpack(FIELD_OFFSET)
 
-  -- draw the 16x16 background map
-  map(0, 0, 0, 0, 16, 16)
-
-  -- draw level map background if map coordinates are defined
   if level.map_x and level.map_y then
     map(level.map_x, level.map_y, ox * T_SIZE, oy * T_SIZE, 10, 10)
 
-    -- for map-based levels, only draw placed tools (mirrors/splitters)
     for i, row in ipairs(field) do
       for j, cell in ipairs(row) do
         if is_tool(cell) then
@@ -907,7 +904,6 @@ function draw_field()
       end
     end
   else
-    -- for old-style levels, draw all field objects
     for i, row in ipairs(field) do
       for j, cell in ipairs(row) do
         local left = (j+ox-1)*T_SIZE
@@ -992,7 +988,7 @@ function draw_ui()
   local _, ty = unpack(TOOL_UI_OFFSET)
   local gx, gy = unpack(pos_to_grid(mx, my))
 
-  print("l"..tostr(current_level).." "..level.name, T_SIZE, T_SIZE, 2)
+  draw_level_name()
 
   local tool_count = 0
   for _, tool in ipairs(tools) do
@@ -1044,6 +1040,8 @@ function draw_ui()
 end
 
 function draw_level_complete()
+  draw_level_name()
+
   local left, top = 71, 3
   local px, py = 3, 3
   local w, h = 48, 18
@@ -1086,11 +1084,7 @@ function join_str(...)
   return result
 end
 
--- old levels array removed to save memory
--- all levels are now map-based in new_levels
-levels = {}
-
-new_levels = {
+levels = {
   {
     name = "cane",
     par = 4,
