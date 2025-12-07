@@ -40,6 +40,9 @@ CURSOR_SPRITE = 32
 STAR_FILL_SPRITE = 48
 STAR_SPRITE = 49
 
+SNOW_MIN_SIZE = 1
+SNOW_MAX_SIZE = 2
+
 -- emitter sprite IDs (counter-clockwise from north)
 LASER_EMIT_N = 40
 LASER_EMIT_NW = 41
@@ -103,6 +106,7 @@ level = {
 
 laser_plot = {}
 laser_plot_tool_chain = {} -- "gx:dx:gy:dy"
+snowflakes = {}
 input = {
     cursor = {0, 0},
     lmb = {
@@ -131,6 +135,7 @@ end
 
 function _init()
   poke(0x5f2d, 1)
+  init_snowflakes()
   if current_state == STATE_LEVEL_EDIT then
     load_level(init_empty_level())
   else
@@ -138,8 +143,41 @@ function _init()
   end
 end
 
+function init_snowflakes()
+  for i = 1, 50 do
+    add(snowflakes, {
+      x = rnd(128),
+      y = rnd(128),
+      speed = 0.15 + rnd(0.25),
+      sway = rnd(1),
+      sway_speed = 0.01 + rnd(0.02),
+      size = SNOW_MIN_SIZE + flr(rnd(SNOW_MAX_SIZE - SNOW_MIN_SIZE + 1))
+    })
+  end
+end
+
+function update_snowflakes()
+  for flake in all(snowflakes) do
+    flake.y += flake.speed
+    flake.sway += flake.sway_speed
+    flake.x += sin(flake.sway) * 0.5
+
+    if flake.y > 128 then
+      flake.y = -2
+      flake.x = rnd(128)
+    end
+  end
+end
+
+function draw_snowflakes()
+  for flake in all(snowflakes) do
+    circfill(flake.x, flake.y, flake.size - 1, 7)
+  end
+end
+
 function _update()
   update_input()
+  update_snowflakes()
   if current_state == STATE_MENU then
     update_menu()
   elseif current_state == STATE_PLAYING then
@@ -272,14 +310,14 @@ function update_level_select()
       end
     end
 
-    if mx >= 52 and mx < 76 and my >= 54 and my < 70 then
+    if mx >= 52 and mx < 76 and my >= 56 and my < 72 then
       sfx(SFX_UI_SELECT)
       current_level = preview_level
       current_state = STATE_PLAYING
       load_level(get_level(current_level))
     end
 
-    if mx >= 52 and mx < 76 and my >= 2 and my < 10 then
+    if mx >= 52 and mx < 76 and my >= 14 and my < 22 then
       sfx(SFX_UI_SELECT)
       field = {}
       targets = {}
@@ -297,7 +335,7 @@ function draw_menu()
   local menu_y = 53
   local spacing = 14
 
-  print("laser light logic", 26, 24, 7)
+  print("l l l", 54, 16, 6)
 
   for i, option in ipairs(menu_options) do
     local y = menu_y + (i - 1) * spacing
@@ -327,6 +365,8 @@ function _draw()
   elseif current_state == STATE_LEVEL_SELECT then
     draw_level_select()
   end
+
+  draw_snowflakes()
 end
 
 function draw_playing()
@@ -351,14 +391,14 @@ function draw_level_select()
 
   local mx, my = unpack(input.cursor)
 
-  local back_hover = mx >= 52 and mx < 76 and my >= 2 and my < 10
+  local back_hover = mx >= 52 and mx < 76 and my >= 14 and my < 22
   local left_hover = mx >= 4 and mx < 12 and my >= 60 and my < 68
   local right_hover = mx >= 116 and mx < 124 and my >= 60 and my < 68
-  local play_hover = mx >= 52 and mx < 76 and my >= 54 and my < 70
+  local play_hover = mx >= 52 and mx < 76 and my >= 56 and my < 72
 
-  rectfill(52, 2, 76, 10, back_hover and 2 or 1)
-  rect(52, 2, 76, 10, back_hover and 12 or 7)
-  print("back", 57, 4, 7)
+  rectfill(52, 14, 76, 22, back_hover and 2 or 1)
+  rect(52, 14, 76, 22, back_hover and 12 or 7)
+  print("back", 57, 16, 7)
 
   if preview_level > 1 then
     rectfill(4, 60, 12, 68, left_hover and 9 or 8)
@@ -372,11 +412,11 @@ function draw_level_select()
     print(">", 119, 62, 7)
   end
 
-  rectfill(52, 54, 76, 70, play_hover and 12 or 11)
-  rect(52, 54, 76, 70, play_hover and 12 or 7)
-  print("play", 57, 60, 7)
+  rectfill(52, 56, 76, 72, play_hover and 12 or 5)
+  rect(52, 56, 76, 72, play_hover and 12 or 7)
+  print("play", 57, 62, 7)
 
-  print("level "..tostr(preview_level), 48, 46, 7)
+  draw_level_name(preview_level)
 
   spr(CURSOR_SPRITE, mx-1, my-1)
 end
@@ -880,8 +920,9 @@ function draw_map_background()
   map(0, 0, 0, 0, 16, 16)
 end
 
-function draw_level_name()
-  print("l"..tostr(current_level).." "..level.name, T_SIZE, T_SIZE, 2)
+function draw_level_name(lvl)
+  local level_num = lvl or current_level
+  print("l"..tostr(level_num).." "..level.name, T_SIZE, T_SIZE, 2)
 end
 
 function draw_field()
