@@ -574,7 +574,7 @@ function update_level_select()
       end
     end
 
-    if mx >= 52 and mx < 76 and my >= 104 and my < 120 then
+    if mx >= 88 and mx < 120 and my >= 114 and my < 122 then
       sfx(SFX_UI_SELECT)
       current_level = preview_level
       dpad_cursor = {5, 5}
@@ -583,7 +583,7 @@ function update_level_select()
       load_level(get_level(current_level))
     end
 
-    if mx >= 52 and mx < 76 and my >= 14 and my < 22 then
+    if mx >= 8 and mx < 40 and my >= 114 and my < 122 then
       sfx(SFX_UI_SELECT)
       field = {}
       targets = {}
