@@ -92,6 +92,9 @@ current_level = 1
 selected_menu_option = 1
 prev_menu_option = 1
 preview_level = 1
+dpad_cursor = {5, 5}
+dpad_mode = "field"
+dpad_tool_index = 1
 
 field = {}
 targets = {}
@@ -120,8 +123,30 @@ input = {
         was_pressed = false,
         down = false
       },
-    x = false,
-    o = false
+    up = {
+        just_pressed = false,
+        was_pressed = false
+      },
+    down = {
+        just_pressed = false,
+        was_pressed = false
+      },
+    left = {
+        just_pressed = false,
+        was_pressed = false
+      },
+    right = {
+        just_pressed = false,
+        was_pressed = false
+      },
+    x = {
+        just_pressed = false,
+        was_pressed = false
+      },
+    o = {
+        just_pressed = false,
+        was_pressed = false
+      }
   }
 
 -- methods --
@@ -199,6 +224,106 @@ function _update()
 end
 
 function update_playing()
+  if dpad_mode == "field" then
+    if input.up.just_pressed then
+      dpad_cursor[2] = dpad_cursor[2] - 1
+      if dpad_cursor[2] < 1 then
+        dpad_cursor[2] = 1
+      else
+        sfx(SFX_UI_HOVER)
+      end
+    end
+
+    if input.down.just_pressed then
+      if dpad_cursor[2] == 10 then
+        dpad_mode = "tool_ui"
+        dpad_tool_index = 1
+        while tools[dpad_tool_index] == EMPTY and dpad_tool_index <= #tools do
+          dpad_tool_index = dpad_tool_index + 1
+        end
+        sfx(SFX_UI_HOVER)
+      else
+        dpad_cursor[2] = dpad_cursor[2] + 1
+        sfx(SFX_UI_HOVER)
+      end
+    end
+
+    if input.left.just_pressed then
+      dpad_cursor[1] = dpad_cursor[1] - 1
+      if dpad_cursor[1] < 1 then
+        dpad_cursor[1] = 1
+      else
+        sfx(SFX_UI_HOVER)
+      end
+    end
+
+    if input.right.just_pressed then
+      dpad_cursor[1] = dpad_cursor[1] + 1
+      if dpad_cursor[1] > 10 then
+        dpad_cursor[1] = 10
+      else
+        sfx(SFX_UI_HOVER)
+      end
+    end
+
+    if input.x.just_pressed then
+      local gx, gy = unpack(dpad_cursor)
+      toggle_cell(gx, gy)
+    end
+
+    if input.o.just_pressed then
+      local gx, gy = unpack(dpad_cursor)
+      clear_cell(gx, gy)
+    end
+  elseif dpad_mode == "tool_ui" then
+    if input.left.just_pressed then
+      sfx(SFX_UI_HOVER)
+      local start_index = dpad_tool_index
+      repeat
+        dpad_tool_index = dpad_tool_index - 1
+        if dpad_tool_index < 1 then
+          dpad_tool_index = #tools
+        end
+      until tools[dpad_tool_index] != EMPTY or dpad_tool_index == start_index
+    end
+
+    if input.right.just_pressed then
+      sfx(SFX_UI_HOVER)
+      local start_index = dpad_tool_index
+      repeat
+        dpad_tool_index = dpad_tool_index + 1
+        if dpad_tool_index > #tools then
+          dpad_tool_index = 1
+        end
+      until tools[dpad_tool_index] != EMPTY or dpad_tool_index == start_index
+    end
+
+    if input.up.just_pressed then
+      sfx(SFX_UI_HOVER)
+      dpad_mode = "field"
+      dpad_cursor[2] = 10
+    end
+
+    if input.x.just_pressed or input.o.just_pressed then
+      local tool = tools[dpad_tool_index]
+      if tool == TOOL_RESET then
+        sfx(SFX_REMOVE_TOOL)
+        if current_state == STATE_LEVEL_EDIT then
+          load_level(init_empty_level())
+        else
+          load_level(get_level(current_level))
+        end
+      elseif tool == TOOL_MENU then
+        sfx(SFX_UI_SELECT)
+        current_state = STATE_MENU
+        selected_menu_option = 1
+      else
+        sfx(SFX_PLACE_TOOL)
+        selected_tool = tool
+      end
+    end
+  end
+
   if input.lmb.just_pressed then
     local mx,my = unpack(input.cursor)
     local gx,gy = unpack(pos_to_grid(mx,my))
@@ -219,12 +344,14 @@ end
 function update_level_complete()
   update_targets()
 
-  if input.x or input.o then
+  if input.x.just_pressed or input.o.just_pressed then
     sfx(SFX_UI_SELECT)
-    if input.x and current_level == get_level_count() then
+    if input.x.just_pressed and current_level == get_level_count() then
       current_state = STATE_WIN
     else
-      current_level = input.x and current_level + 1 or current_level
+      current_level = input.x.just_pressed and current_level + 1 or current_level
+      dpad_cursor = {5, 5}
+      dpad_mode = "field"
       load_level(get_level(current_level))
       current_state = STATE_PLAYING
     end
@@ -232,10 +359,12 @@ function update_level_complete()
 end
 
 function update_win()
-  if input.o then
+  if input.o.just_pressed then
     sfx(SFX_UI_SELECT)
     current_level = 1
     selected_tool = EMPTY
+    dpad_cursor = {5, 5}
+    dpad_mode = "field"
     load_level(get_level(current_level))
     current_state = STATE_PLAYING
   end
@@ -257,12 +386,28 @@ function update_win()
 end
 
 function update_menu()
-  if input.lmb.just_pressed then
-    local mx, my = unpack(input.cursor)
+  if input.up.just_pressed then
+    sfx(SFX_UI_HOVER)
+    selected_menu_option = selected_menu_option - 1
+    if selected_menu_option < 1 then
+      selected_menu_option = 3
+    end
+  end
 
+  if input.down.just_pressed then
+    sfx(SFX_UI_HOVER)
+    selected_menu_option = selected_menu_option + 1
+    if selected_menu_option > 3 then
+      selected_menu_option = 1
+    end
+  end
+
+  if input.lmb.just_pressed or input.x.just_pressed or input.o.just_pressed then
     if selected_menu_option == 1 then
       sfx(SFX_UI_SELECT)
       current_level = 1
+      dpad_cursor = {5, 5}
+      dpad_mode = "field"
       current_state = STATE_PLAYING
       load_level(get_level(current_level))
     elseif selected_menu_option == 2 then
@@ -272,6 +417,8 @@ function update_menu()
       current_state = STATE_LEVEL_SELECT
     elseif selected_menu_option == 3 then
       sfx(SFX_UI_SELECT)
+      dpad_cursor = {5, 5}
+      dpad_mode = "field"
       current_state = STATE_LEVEL_EDIT
       load_level(init_empty_level())
     end
@@ -298,6 +445,41 @@ function update_level_select()
   update_lasers()
   update_targets()
 
+  if input.left.just_pressed then
+    if preview_level > 1 then
+      sfx(SFX_UI_SELECT)
+      preview_level = preview_level - 1
+      load_level(get_level(preview_level))
+    end
+  end
+
+  if input.right.just_pressed then
+    if preview_level < get_level_count() then
+      sfx(SFX_UI_SELECT)
+      preview_level = preview_level + 1
+      load_level(get_level(preview_level))
+    end
+  end
+
+  if input.x.just_pressed then
+    sfx(SFX_UI_SELECT)
+    current_level = preview_level
+    dpad_cursor = {5, 5}
+    dpad_mode = "field"
+    current_state = STATE_PLAYING
+    load_level(get_level(current_level))
+  end
+
+  if input.o.just_pressed then
+    sfx(SFX_UI_SELECT)
+    field = {}
+    targets = {}
+    laser_plot = {}
+    laser_plot_tool_chain = {}
+    current_state = STATE_MENU
+    selected_menu_option = 1
+  end
+
   if input.lmb.just_pressed then
     local mx, my = unpack(input.cursor)
 
@@ -317,9 +499,11 @@ function update_level_select()
       end
     end
 
-    if mx >= 52 and mx < 76 and my >= 56 and my < 72 then
+    if mx >= 52 and mx < 76 and my >= 104 and my < 120 then
       sfx(SFX_UI_SELECT)
       current_level = preview_level
+      dpad_cursor = {5, 5}
+      dpad_mode = "field"
       current_state = STATE_PLAYING
       load_level(get_level(current_level))
     end
@@ -401,7 +585,7 @@ function draw_level_select()
   local back_hover = mx >= 52 and mx < 76 and my >= 14 and my < 22
   local left_hover = mx >= 4 and mx < 12 and my >= 60 and my < 68
   local right_hover = mx >= 116 and mx < 124 and my >= 60 and my < 68
-  local play_hover = mx >= 52 and mx < 76 and my >= 56 and my < 72
+  local play_hover = mx >= 52 and mx < 76 and my >= 104 and my < 120
 
   rectfill(52, 14, 76, 22, back_hover and 2 or 1)
   rect(52, 14, 76, 22, back_hover and 12 or 7)
@@ -419,9 +603,9 @@ function draw_level_select()
     print(">", 119, 62, 7)
   end
 
-  rectfill(52, 56, 76, 72, play_hover and 12 or 5)
-  rect(52, 56, 76, 72, play_hover and 12 or 7)
-  print("play", 57, 62, 7)
+  rectfill(52, 104, 76, 120, play_hover and 12 or 5)
+  rect(52, 104, 76, 120, play_hover and 12 or 7)
+  print("play", 57, 110, 7)
 
   draw_level_name(preview_level)
 
@@ -565,8 +749,83 @@ function update_input()
     input.rmb.was_pressed = false
   end
 
-  input.o = btn(4)
-  input.x = btn(5)
+  local up_down = btn(2)
+  if up_down then
+    if not input.up.was_pressed then
+      input.up.just_pressed = true
+      input.up.was_pressed = true
+    else
+      input.up.just_pressed = false
+    end
+  else
+    input.up.just_pressed = false
+    input.up.was_pressed = false
+  end
+
+  local down_down = btn(3)
+  if down_down then
+    if not input.down.was_pressed then
+      input.down.just_pressed = true
+      input.down.was_pressed = true
+    else
+      input.down.just_pressed = false
+    end
+  else
+    input.down.just_pressed = false
+    input.down.was_pressed = false
+  end
+
+  local left_down = btn(0)
+  if left_down then
+    if not input.left.was_pressed then
+      input.left.just_pressed = true
+      input.left.was_pressed = true
+    else
+      input.left.just_pressed = false
+    end
+  else
+    input.left.just_pressed = false
+    input.left.was_pressed = false
+  end
+
+  local right_down = btn(1)
+  if right_down then
+    if not input.right.was_pressed then
+      input.right.just_pressed = true
+      input.right.was_pressed = true
+    else
+      input.right.just_pressed = false
+    end
+  else
+    input.right.just_pressed = false
+    input.right.was_pressed = false
+  end
+
+  local x_down = btn(5)
+  if x_down then
+    if not input.x.was_pressed then
+      input.x.just_pressed = true
+      input.x.was_pressed = true
+    else
+      input.x.just_pressed = false
+    end
+  else
+    input.x.just_pressed = false
+    input.x.was_pressed = false
+  end
+
+  local o_down = btn(4)
+  if o_down then
+    if not input.o.was_pressed then
+      input.o.just_pressed = true
+      input.o.was_pressed = true
+    else
+      input.o.just_pressed = false
+    end
+  else
+    input.o.just_pressed = false
+    input.o.was_pressed = false
+  end
 end
 
 function update_targets()
@@ -1085,6 +1344,10 @@ function draw_ui()
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 12)
       end
 
+      if dpad_mode == "tool_ui" and i == dpad_tool_index then
+        rect(x, y, x + T_SIZE - 1, y + T_SIZE, 11)
+      end
+
       if selected_tool == tool then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
       end
@@ -1095,6 +1358,13 @@ function draw_ui()
     local left = (gx+ox-1)*T_SIZE
     local top = (gy+oy-1)*T_SIZE
     rect(left,top,left+T_SIZE,top+T_SIZE,12)
+  end
+
+  if dpad_mode == "field" then
+    local dgx, dgy = unpack(dpad_cursor)
+    local left = (dgx+ox-1)*T_SIZE
+    local top = (dgy+oy-1)*T_SIZE
+    rect(left,top,left+T_SIZE,top+T_SIZE,11)
   end
 
   spr(CURSOR_SPRITE, mx-1, my-1)
