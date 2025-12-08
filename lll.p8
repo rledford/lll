@@ -83,7 +83,7 @@ TOOL_SPRITES = {
     [TOOL_EMIT] = 16
   }
 
-TARGET_SPRITES = {51,52,53,54,55,56}
+TARGET_SPRITES = {51,52,53,54,55,56,57}
 
 -- globals --
 
@@ -107,6 +107,7 @@ level = {
 laser_plot = {}
 laser_plot_tool_chain = {} -- "gx:dx:gy:dy"
 snowflakes = {}
+target_anim_tick = 0
 input = {
     cursor = {0, 0},
     lmb = {
@@ -216,6 +217,8 @@ function update_playing()
 end
 
 function update_level_complete()
+  update_targets()
+
   if input.x or input.o then
     sfx(SFX_UI_SELECT)
     if input.x and current_level == get_level_count() then
@@ -237,14 +240,18 @@ function update_win()
     current_state = STATE_PLAYING
   end
 
-  for y = 5, 11, 5 do
-    for x = 18, 29, 1 do
-      mset(x,y,rnd(TARGET_SPRITES))
+  target_anim_tick += 1
+  if target_anim_tick >= 15 then
+    target_anim_tick = 0
+    for y = 5, 11, 5 do
+      for x = 18, 29, 1 do
+        mset(x,y,rnd(TARGET_SPRITES))
+      end
     end
-  end
-  for x = 18, 30, 11 do
-    for y = 6, 9, 1 do
-      mset(x,y,rnd(TARGET_SPRITES))
+    for x = 18, 30, 11 do
+      for y = 6, 9, 1 do
+        mset(x,y,rnd(TARGET_SPRITES))
+      end
     end
   end
 end
@@ -478,7 +485,8 @@ function load_level(level_data)
           targets[join_str(fx, fy)] = {
             fx = fx,
             fy = fy,
-            is_active = false
+            is_active = false,
+            sprite = rnd(TARGET_SPRITES)
           }
         elseif tile_id > 0 then
           obj = {type = LASER_BLOCK, fx = fx, fy = fy}
@@ -498,7 +506,8 @@ function load_level(level_data)
         targets[join_str(obj.fx, obj.fy)] = {
           fx = obj.fx,
           fy = obj.fy,
-          is_active = false
+          is_active = false,
+          sprite = rnd(TARGET_SPRITES)
         }
       end
     end
@@ -571,6 +580,16 @@ function update_targets()
     target = targets[join_str(gx,gy)]
     if target then
       target.is_active = true
+    end
+  end
+
+  target_anim_tick += 1
+  if target_anim_tick >= 15 then
+    target_anim_tick = 0
+    for _, target in pairs(targets) do
+      if target.is_active then
+        target.sprite = rnd(TARGET_SPRITES)
+      end
     end
   end
 end
@@ -772,7 +791,8 @@ function toggle_cell(gx, gy)
       targets[target_key] = {
         fx = gx,
         fy = gy,
-        is_active = false
+        is_active = false,
+        sprite = rnd(TARGET_SPRITES)
       }
     elseif cell != EMPTY and t == LASER_TARGET then
       targets[target_key] = nil
@@ -974,7 +994,7 @@ end
 function draw_targets()
   for _, target in pairs(targets) do
     local x, y = unpack(grid_to_pos(target.fx, target.fy))
-    spr(target.is_active and rnd(TARGET_SPRITES) or 50, x, y)
+    spr(target.is_active and target.sprite or TOOL_SPRITES[TOOL_TARGET], x, y)
   end
 end
 
@@ -1202,7 +1222,7 @@ __gfx__
 080878000202202000000000000000000000000000000000000000000000000000111110001111100011111000c111100011c110001111c00011111000111110
 00008000020220200111111000000000000000000000000000000000000000000001110000011100000111000001110000011100000111000001110000011100
 00000000020220200000000000000000000000000000000000000000000000000011111000111110001111100011111000111110001111100011111000111110
-000aa000000aa00000077000000aa000000aa000000aa000000aa000000aa000000aa000000ff000000000000000000000000000000000000000000000000000
+000aa000000aa00000077000000aa000000aa000000aa000000aa000000aa000000aa000000aa000000000000000000000000000000000000000000000000000
 00aaaa0000a00a0000066000000cc000000ff00000033000000ee000000990000008800000077000000000000000000000000000000000000000000000000000
 aaaaaaaaaaa00aaa0065560000c33c0000f99f00003bb30000e88e00009ff900008aa800007ff700000000000000000000000000000000000000000000000000
 aaaaaaaaa000000a065575600c33b3c00f99a9f003bb7b300e88a8e009ff7f9008aa7a8007ff7f70000000000000000000000000000000000000000000000000
