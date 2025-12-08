@@ -238,8 +238,16 @@ function update_playing()
       if dpad_cursor[2] == 10 then
         dpad_mode = "tool_ui"
         dpad_tool_index = 1
-        while tools[dpad_tool_index] == EMPTY and dpad_tool_index <= #tools do
-          dpad_tool_index = dpad_tool_index + 1
+        for i, tool in ipairs(tools) do
+          if tool == selected_tool then
+            dpad_tool_index = i
+            break
+          end
+        end
+        if tools[dpad_tool_index] == EMPTY then
+          while tools[dpad_tool_index] == EMPTY and dpad_tool_index <= #tools do
+            dpad_tool_index = dpad_tool_index + 1
+          end
         end
         sfx(SFX_UI_HOVER)
       else
@@ -714,7 +722,24 @@ function load_level(level_data)
   add(tools, TOOL_RESET)
   add(tools, TOOL_MENU)
 
-  selected_tool = selected_tool == EMPTY and tools[1] or selected_tool
+  local tool_found = false
+  if selected_tool != EMPTY then
+    for _, tool in ipairs(tools) do
+      if tool == selected_tool then
+        tool_found = true
+        break
+      end
+    end
+  end
+
+  if not tool_found then
+    for _, tool in ipairs(tools) do
+      if tool != EMPTY and tool != TOOL_RESET and tool != TOOL_MENU then
+        selected_tool = tool
+        break
+      end
+    end
+  end
 
   level = level_data
 end
@@ -1346,9 +1371,7 @@ function draw_ui()
 
       if dpad_mode == "tool_ui" and i == dpad_tool_index then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 11)
-      end
-
-      if selected_tool == tool then
+      elseif selected_tool == tool then
         rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
       end
     end
