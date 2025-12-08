@@ -92,6 +92,7 @@ current_level = 1
 selected_menu_option = 1
 prev_menu_option = 1
 preview_level = 1
+selected_complete_option = 1
 dpad_cursor = {5, 5}
 dpad_mode = "field"
 dpad_tool_index = 1
@@ -112,6 +113,8 @@ laser_plot_tool_chain = {} -- "gx:dx:gy:dy"
 snowflakes = {}
 target_anim_tick = 0
 input = {
+    mode = "controller",
+    mode_just_switched = false,
     cursor = {0, 0},
     lmb = {
         just_pressed = false,
@@ -352,16 +355,65 @@ end
 function update_level_complete()
   update_targets()
 
-  if input.x.just_pressed or input.o.just_pressed then
-    sfx(SFX_UI_SELECT)
-    if input.x.just_pressed and current_level == get_level_count() then
-      current_state = STATE_WIN
-    else
-      current_level = input.x.just_pressed and current_level + 1 or current_level
-      dpad_cursor = {5, 5}
-      dpad_mode = "field"
-      load_level(get_level(current_level))
-      current_state = STATE_PLAYING
+  if input.mode == "controller" then
+    if input.up.just_pressed then
+      selected_complete_option = 1
+      sfx(SFX_UI_HOVER)
+    elseif input.down.just_pressed then
+      selected_complete_option = 2
+      sfx(SFX_UI_HOVER)
+    end
+
+    if input.x.just_pressed then
+      sfx(SFX_UI_SELECT)
+      if selected_complete_option == 1 then
+        if current_level == get_level_count() then
+          current_state = STATE_WIN
+        else
+          current_level = current_level + 1
+          dpad_cursor = {5, 5}
+          dpad_mode = "field"
+          load_level(get_level(current_level))
+          current_state = STATE_PLAYING
+        end
+      else
+        dpad_cursor = {5, 5}
+        dpad_mode = "field"
+        load_level(get_level(current_level))
+        current_state = STATE_PLAYING
+      end
+      selected_complete_option = 1
+    end
+  else
+    local mx, my = unpack(input.cursor)
+    local left, top = 71, 3
+    local px, py = 3, 3
+    local w, h = 48, 18
+
+    local continue_hover = mx >= left + px and mx < left + w - px and my >= top + h - py - T_SIZE*1.5 and my < top + h - py - T_SIZE*1.5 + 6
+    local replay_hover = mx >= left + px and mx < left + w - px and my >= top + h - py - T_SIZE*0.5 and my < top + h - py - T_SIZE*0.5 + 6
+
+    if input.lmb.just_pressed then
+      if continue_hover then
+        sfx(SFX_UI_SELECT)
+        if current_level == get_level_count() then
+          current_state = STATE_WIN
+        else
+          current_level = current_level + 1
+          dpad_cursor = {5, 5}
+          dpad_mode = "field"
+          load_level(get_level(current_level))
+          current_state = STATE_PLAYING
+        end
+        selected_complete_option = 1
+      elseif replay_hover then
+        sfx(SFX_UI_SELECT)
+        dpad_cursor = {5, 5}
+        dpad_mode = "field"
+        load_level(get_level(current_level))
+        current_state = STATE_PLAYING
+        selected_complete_option = 1
+      end
     end
   end
 end
@@ -369,12 +421,25 @@ end
 function update_win()
   if input.o.just_pressed then
     sfx(SFX_UI_SELECT)
-    current_level = 1
-    selected_tool = EMPTY
-    dpad_cursor = {5, 5}
-    dpad_mode = "field"
-    load_level(get_level(current_level))
-    current_state = STATE_PLAYING
+    field = {}
+    targets = {}
+    laser_plot = {}
+    laser_plot_tool_chain = {}
+    current_state = STATE_MENU
+    selected_menu_option = 1
+  end
+
+  if input.lmb.just_pressed then
+    local mx, my = unpack(input.cursor)
+    if mx >= 44 and mx < 84 and my >= 66 and my < 74 then
+      sfx(SFX_UI_SELECT)
+      field = {}
+      targets = {}
+      laser_plot = {}
+      laser_plot_tool_chain = {}
+      current_state = STATE_MENU
+      selected_menu_option = 1
+    end
   end
 
   target_anim_tick += 1
@@ -432,16 +497,18 @@ function update_menu()
     end
   end
 
-  local mx, my = unpack(input.cursor)
-  local menu_y = 53
-  local spacing = 14
+  if input.mode == "mouse" then
+    local mx, my = unpack(input.cursor)
+    local menu_y = 53
+    local spacing = 14
 
-  for i = 1, 3 do
-    local y = menu_y + (i - 1) * spacing
-    if my >= y and my < y + 8 then
-      if selected_menu_option != i then
-        sfx(SFX_UI_HOVER)
-        selected_menu_option = i
+    for i = 1, 3 do
+      local y = menu_y + (i - 1) * spacing
+      if my >= y and my < y + 8 then
+        if selected_menu_option != i then
+          sfx(SFX_UI_HOVER)
+          selected_menu_option = i
+        end
       end
     end
   end
@@ -534,15 +601,19 @@ function draw_menu()
   local menu_y = 53
   local spacing = 14
 
-  print("l l l", 54, 16, 6)
-
   for i, option in ipairs(menu_options) do
     local y = menu_y + (i - 1) * spacing
     local color = selected_menu_option == i and 12 or 7
-    print(option, 44, y, color)
+    if selected_menu_option == i then
+      print(">", 41, y, 12)
+    end
+    print(option, 47, y, color)
   end
 
-  spr(CURSOR_SPRITE, stat(32)-1, stat(33)-1)
+  if input.mode == "mouse" then
+    local mx, my = unpack(input.cursor)
+    spr(CURSOR_SPRITE, mx-1, my-1)
+  end
 end
 
 function _draw()
@@ -580,7 +651,19 @@ function draw_win()
   map(16, 0, 0, 0)
   local ox, oy = T_SIZE, T_SIZE
   print("thanks for playing", 28, 54)
-	print("🅾️ restart", 44, 70)
+
+  if input.mode == "mouse" then
+    local mx, my = unpack(input.cursor)
+    local menu_hover = mx >= 44 and mx < 84 and my >= 66 and my < 74
+
+    rectfill(44, 66, 84, 74, menu_hover and 2 or 1)
+    rect(44, 66, 84, 74, menu_hover and 12 or 7)
+    print("menu", 57, 68, 7)
+
+    spr(CURSOR_SPRITE, mx-1, my-1)
+  else
+    print("🅾️ menu", 48, 68, 7)
+  end
 end
 
 function draw_level_select()
@@ -592,14 +675,25 @@ function draw_level_select()
 
   draw_level_name(preview_level)
 
-  local back_hover = mx >= 52 and mx < 76 and my >= 14 and my < 22
-  local left_hover = mx >= 4 and mx < 12 and my >= 60 and my < 68
-  local right_hover = mx >= 116 and mx < 124 and my >= 60 and my < 68
-  local play_hover = mx >= 52 and mx < 76 and my >= 104 and my < 120
+  local back_hover = false
+  local left_hover = false
+  local right_hover = false
+  local play_hover = false
 
-  rectfill(52, 14, 76, 22, back_hover and 2 or 1)
-  rect(52, 14, 76, 22, back_hover and 12 or 7)
-  print("back", 57, 16, 7)
+  if input.mode == "mouse" then
+    back_hover = mx >= 8 and mx < 40 and my >= 114 and my < 122
+    left_hover = mx >= 4 and mx < 12 and my >= 60 and my < 68
+    right_hover = mx >= 116 and mx < 124 and my >= 60 and my < 68
+    play_hover = mx >= 88 and mx < 120 and my >= 114 and my < 122
+
+    rectfill(8, 114, 40, 122, back_hover and 2 or 1)
+    rect(8, 114, 40, 122, back_hover and 12 or 7)
+    print("back", 17, 116, 7)
+
+    rectfill(88, 114, 120, 122, play_hover and 2 or 1)
+    rect(88, 114, 120, 122, play_hover and 12 or 7)
+    print("play", 97, 116, 7)
+  end
 
   if preview_level > 1 then
     rectfill(4, 60, 12, 68, left_hover and 9 or 8)
@@ -613,11 +707,14 @@ function draw_level_select()
     print(">", 119, 62, 7)
   end
 
-  rectfill(52, 104, 76, 120, play_hover and 12 or 5)
-  rect(52, 104, 76, 120, play_hover and 12 or 7)
-  print("play", 57, 110, 7)
+  if input.mode == "controller" then
+    print("🅾️ back", 8, 118, 7)
+    print("❎ play", 88, 118, 7)
+  end
 
-  spr(CURSOR_SPRITE, mx-1, my-1)
+  if input.mode == "mouse" then
+    spr(CURSOR_SPRITE, mx-1, my-1)
+  end
 end
 
 
@@ -745,6 +842,8 @@ function load_level(level_data)
 end
 
 function update_input()
+  input.mode_just_switched = false
+
   local mb = stat(34)
   input.cursor = {stat(32)-1, stat(33)-1}
   input.lmb.down = mb & 1 != 0
@@ -754,6 +853,11 @@ function update_input()
     if not input.lmb.was_pressed then
       input.lmb.just_pressed = true
       input.lmb.was_pressed = true
+      if input.mode != "mouse" then
+        input.mode = "mouse"
+        input.mode_just_switched = true
+        input.lmb.just_pressed = false
+      end
     else
       input.lmb.just_pressed = false
     end
@@ -779,6 +883,10 @@ function update_input()
     if not input.up.was_pressed then
       input.up.just_pressed = true
       input.up.was_pressed = true
+      if input.mode != "controller" then
+        input.mode = "controller"
+        input.mode_just_switched = true
+      end
     else
       input.up.just_pressed = false
     end
@@ -792,6 +900,10 @@ function update_input()
     if not input.down.was_pressed then
       input.down.just_pressed = true
       input.down.was_pressed = true
+      if input.mode != "controller" then
+        input.mode = "controller"
+        input.mode_just_switched = true
+      end
     else
       input.down.just_pressed = false
     end
@@ -805,6 +917,10 @@ function update_input()
     if not input.left.was_pressed then
       input.left.just_pressed = true
       input.left.was_pressed = true
+      if input.mode != "controller" then
+        input.mode = "controller"
+        input.mode_just_switched = true
+      end
     else
       input.left.just_pressed = false
     end
@@ -818,6 +934,10 @@ function update_input()
     if not input.right.was_pressed then
       input.right.just_pressed = true
       input.right.was_pressed = true
+      if input.mode != "controller" then
+        input.mode = "controller"
+        input.mode_just_switched = true
+      end
     else
       input.right.just_pressed = false
     end
@@ -831,6 +951,10 @@ function update_input()
     if not input.x.was_pressed then
       input.x.just_pressed = true
       input.x.was_pressed = true
+      if input.mode != "controller" then
+        input.mode = "controller"
+        input.mode_just_switched = true
+      end
     else
       input.x.just_pressed = false
     end
@@ -844,6 +968,10 @@ function update_input()
     if not input.o.was_pressed then
       input.o.just_pressed = true
       input.o.was_pressed = true
+      if input.mode != "controller" then
+        input.mode = "controller"
+        input.mode_just_switched = true
+      end
     else
       input.o.just_pressed = false
     end
@@ -1368,32 +1496,44 @@ function draw_ui()
 
       spr(TOOL_SPRITES[tool], x, y)
 
-      if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
-        rect(x, y, x + T_SIZE - 1, y + T_SIZE, 12)
+      if input.mode == "mouse" then
+        if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
+          rect(x, y, x + T_SIZE - 1, y + T_SIZE, 12)
+        end
       end
 
-      if dpad_mode == "tool_ui" and i == dpad_tool_index then
-        rect(x, y, x + T_SIZE - 1, y + T_SIZE, 11)
-      elseif selected_tool == tool then
-        rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
+      if input.mode == "controller" then
+        if dpad_mode == "tool_ui" and i == dpad_tool_index then
+          rect(x, y, x + T_SIZE - 1, y + T_SIZE, 11)
+        elseif selected_tool == tool then
+          rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
+        end
+      else
+        if selected_tool == tool then
+          rect(x, y, x + T_SIZE - 1, y + T_SIZE, 7)
+        end
       end
     end
   end
 
-  if gx >= 1 and gx <= fw and gy >= 1 and gy <= fh then
-    local left = (gx+ox-1)*T_SIZE
-    local top = (gy+oy-1)*T_SIZE
-    rect(left,top,left+T_SIZE,top+T_SIZE,12)
+  if input.mode == "mouse" then
+    if gx >= 1 and gx <= fw and gy >= 1 and gy <= fh then
+      local left = (gx+ox-1)*T_SIZE
+      local top = (gy+oy-1)*T_SIZE
+      rect(left,top,left+T_SIZE,top+T_SIZE,12)
+    end
   end
 
-  if dpad_mode == "field" then
+  if input.mode == "controller" and dpad_mode == "field" then
     local dgx, dgy = unpack(dpad_cursor)
     local left = (dgx+ox-1)*T_SIZE
     local top = (dgy+oy-1)*T_SIZE
     rect(left,top,left+T_SIZE,top+T_SIZE,11)
   end
 
-  spr(CURSOR_SPRITE, mx-1, my-1)
+  if input.mode == "mouse" then
+    spr(CURSOR_SPRITE, mx-1, my-1)
+  end
 end
 
 function draw_level_complete()
@@ -1422,8 +1562,39 @@ function draw_level_complete()
     spr(star, x, y)
   end
 
-  print("❎ continue", left + px, top + h - py - T_SIZE*1.5,7)
-	print("🅾️ replay", left + px, top + h - py - T_SIZE*0.5,7)
+  local mx, my = unpack(input.cursor)
+  local continue_y = top + h - py - T_SIZE*1.5
+  local replay_y = top + h - py - T_SIZE*0.5
+
+  local show_continue_indicator = false
+  local show_replay_indicator = false
+
+  if input.mode == "controller" then
+    show_continue_indicator = selected_complete_option == 1
+    show_replay_indicator = selected_complete_option == 2
+  else
+    local continue_hover = mx >= left + px and mx < left + w - px and my >= continue_y and my < continue_y + 6
+    local replay_hover = mx >= left + px and mx < left + w - px and my >= replay_y and my < replay_y + 6
+    show_continue_indicator = continue_hover
+    show_replay_indicator = replay_hover
+  end
+
+  local continue_color = show_continue_indicator and 12 or 7
+  local replay_color = show_replay_indicator and 12 or 7
+
+  if show_continue_indicator then
+    print(">", left + px, continue_y, 12)
+  end
+  print("continue", left + px + 6, continue_y, continue_color)
+
+  if show_replay_indicator then
+    print(">", left + px, replay_y, 12)
+  end
+  print("replay", left + px + 6, replay_y, replay_color)
+
+  if input.mode == "mouse" then
+    spr(CURSOR_SPRITE, mx-1, my-1)
+  end
 end
 
 function is_mirror(cell)
@@ -1543,21 +1714,21 @@ aaaaaaaaa000000a065575600c33b3c00f99a9f003bb7b300e88a8e009ff7f9008aa7a8007ff7f70
 0aaaaaa00a0000a00065560000c33c0000f99f00003bb30000e88e00009ff900008aa800007ff700000000000000000000000000000000000000000000000000
 aaaaaaaaa00aa00a0065560000c33c0000f99f00003bb30000e88e00009ff900008aa800007ff700000000000000000000000000000000000000000000000000
 aaa00aaaaaa00aaa00066000000cc000000ff00000033000000ee000000990000008800000077000000000000000000000000000000000000000000000000000
-00000000000aa0700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07000cc0070330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000ccc0003bb3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000ccc0003bb7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00ccc00003b7bb300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0ccc0070003bb3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0cc00777003bb3070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000070000330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-07077000000007000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000660000cc077700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-006556000ccc07000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0655756000ccc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-06575560000ccc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000aa0700000000000000000000000007777770777777707777777000000000000000000000000000000000000000000000000000000000000000000
+07000cc0070330000000000000000000000000000000070700000707000007000000000000000000000000000000000000000000000000000000000000000000
+0000ccc0003bb3000000000000000000000000000ccc07070ccc07070ccc07000000000000000000000000000000000000000000000000000000000000000000
+000ccc0003bb7b300000000000000000000000000c1c07070c1c07070c1c07000000000000000000000000000000000000000000000000000000000000000000
+00ccc00003b7bb300000000000000000000000000c1c07070c1c07070c1c07000000000000000000000000000000000000000000000000000000000000000000
+0ccc0070003bb3000000000000000000000000000c1c07070c1c07070c1c07000000000000000000000000000000000000000000000000000000000000000000
+0cc00777003bb3070000000000000000000000000c1c07070c1c07070c1c07000000000000000000000000000000000000000000000000000000000000000000
+00000070000330000000000000000000000000000c1c07070c1c07070c1c07000000000000000000000000000000000000000000000000000000000000000000
+07077000000007000000000000000000000000000c1c07770c1c07770c1c07770000000000000000000000000000000000000000000000000000000000000000
+000660000cc077700000000000000000000000000c1c00000c1c00000c1c00000000000000000000000000000000000000000000000000000000000000000000
+006556000ccc07000000000000000000000000000c1cccc00c1cccc00c1cccc00000000000000000000000000000000000000000000000000000000000000000
+0655756000ccc0000000000000000000000000000c1111c00c1111c00c1111c00000000000000000000000000000000000000000000000000000000000000000
+06575560000ccc000000000000000000000000000cccccc00cccccc00cccccc00000000000000000000000000000000000000000000000000000000000000000
 006556070000ccc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0065560000700cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0065560000700cc00000000000000000000000007777777777777777777777770000000000000000000000000000000000000000000000000000000000000000
 70066000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1735,8 +1906,8 @@ __label__
 __map__
 0101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01000000000000000000000000000001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01000000000000000000000000000001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-01000002020202020202020202030001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01000000000000000000000000000001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000004546470000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+01000002020202020202020202030001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010000000000005556570000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01000002020202020202020202030001011a1a1a1a1a1a1a1a1a1a1a1a1a1a01010001010101010101010101010100010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01000002020202020202020202030001011a3435363436373534333736381a01010033350133383436353337363400010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 01000002020202020202020202030001011a3300000000000000000000351a01010000000100000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
