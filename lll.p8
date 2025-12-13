@@ -705,20 +705,22 @@ function draw_instructions()
 
   print("how to play", 38, 4, 12)
 
-  print("light up all targets with", 8, 14, 7)
-  print("the laser beam", 8, 20, 7)
+  local y = 14
+  spr(TOOL_SPRITES[TOOL_TARGET], 8, y)
+  print("light: activate all with", 20, y+2, 7)
+  print("  the laser", 20, y+8, 7)
 
-  local y = 30
+  y = 32
   spr(TOOL_SPRITES[TOOL_MIRROR], 8, y)
   print("mirror: reflects", 20, y+2, 7)
   print("  the laser", 20, y+8, 7)
 
-  y = 48
+  y = 50
   spr(TOOL_SPRITES[TOOL_SPLIT], 8, y)
   print("splitter: splits", 20, y+2, 7)
   print("  the laser", 20, y+8, 7)
 
-  y = 66
+  y = 68
   spr(TOOL_SPRITES[TOOL_BLOCK], 8, y)
   print("tree: blocks", 20, y+2, 7)
   print("  the laser", 20, y+8, 7)
@@ -1852,10 +1854,10 @@ levels = {
   },
   {
     name = "star",
-    par = 7,
+    par = 4,
     map_x = 20,
     map_y = 36,
-    tools = {{type=TOOL_SPLIT, max=4}, {type=TOOL_MIRROR, max=6}},
+    tools = {{type=TOOL_SPLIT, max=4}, {type=TOOL_MIRROR, max=4}},
     attribution = "doriencey"
   },
   {
@@ -1875,7 +1877,7 @@ levels = {
 }
 
 __gfx__
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000777777070707007
+00000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000777777070707007
 00000000011111100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007070707707777770
 00700700011001100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007707770707700777
 00077000010110100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007077777777077070
