@@ -113,6 +113,7 @@ laser_plot = {}
 laser_plot_tool_chain = {} -- "gx:dx:gy:dy"
 snowflakes = {}
 target_anim_tick = 0
+level_complete_timer = 0
 input = {
     mode = "controller",
     mode_just_switched = false,
@@ -215,6 +216,7 @@ function _update()
     if check_win() then
       sfx(SFX_LEVEL_COMPLETE)
       current_state = STATE_LEVEL_COMPLETE
+      level_complete_timer = 0
     end
   elseif current_state == STATE_LEVEL_COMPLETE then
     update_level_complete()
@@ -357,6 +359,12 @@ end
 
 function update_level_complete()
   update_targets()
+
+  level_complete_timer += 1
+
+  if level_complete_timer < 15 then
+    return
+  end
 
   if input.mode == "controller" then
     if input.up.just_pressed then
