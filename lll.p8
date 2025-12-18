@@ -735,8 +735,8 @@ function draw_instructions()
   spr(TOOL_SPRITES[TOOL_BLOCK], 8, y)
   print("tree: blocks laser", 20, y+2, 7)
 
-  print("❎/click to place and rotate", 8, 92, 7)
-  print("🅾️/right-click to remove", 8, 104, 7)
+  print("❎/click to place and rotate", 8, 88, 7)
+  print("🅾️/right-click to remove", 8, 100, 7)
 
   if input.mode == "mouse" then
     local mx, my = unpack(input.cursor)
