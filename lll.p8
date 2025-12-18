@@ -174,6 +174,7 @@ function _init()
   else
     load_level(get_level(current_level))
   end
+  music(0, 500)
 end
 
 function init_snowflakes()
@@ -216,7 +217,7 @@ function _update()
   elseif current_state == STATE_PLAYING then
     update_playing()
     if check_win() then
-      sfx(SFX_LEVEL_COMPLETE)
+      sfx(SFX_LEVEL_COMPLETE, 3)
       current_state = STATE_LEVEL_COMPLETE
       level_complete_timer = 0
     end
@@ -241,7 +242,7 @@ function update_playing()
       if dpad_cursor[2] < 1 then
         dpad_cursor[2] = 1
       else
-        sfx(SFX_UI_HOVER)
+        sfx(SFX_UI_HOVER, 3)
       end
     end
 
@@ -260,10 +261,10 @@ function update_playing()
             dpad_tool_index = dpad_tool_index + 1
           end
         end
-        sfx(SFX_UI_HOVER)
+        sfx(SFX_UI_HOVER, 3)
       else
         dpad_cursor[2] = dpad_cursor[2] + 1
-        sfx(SFX_UI_HOVER)
+        sfx(SFX_UI_HOVER, 3)
       end
     end
 
@@ -272,7 +273,7 @@ function update_playing()
       if dpad_cursor[1] < 1 then
         dpad_cursor[1] = 1
       else
-        sfx(SFX_UI_HOVER)
+        sfx(SFX_UI_HOVER, 3)
       end
     end
 
@@ -281,7 +282,7 @@ function update_playing()
       if dpad_cursor[1] > 10 then
         dpad_cursor[1] = 10
       else
-        sfx(SFX_UI_HOVER)
+        sfx(SFX_UI_HOVER, 3)
       end
     end
 
@@ -296,7 +297,7 @@ function update_playing()
     end
   elseif dpad_mode == "tool_ui" then
     if input.left.just_pressed then
-      sfx(SFX_UI_HOVER)
+      sfx(SFX_UI_HOVER, 3)
       local start_index = dpad_tool_index
       repeat
         dpad_tool_index = dpad_tool_index - 1
@@ -307,7 +308,7 @@ function update_playing()
     end
 
     if input.right.just_pressed then
-      sfx(SFX_UI_HOVER)
+      sfx(SFX_UI_HOVER, 3)
       local start_index = dpad_tool_index
       repeat
         dpad_tool_index = dpad_tool_index + 1
@@ -318,7 +319,7 @@ function update_playing()
     end
 
     if input.up.just_pressed then
-      sfx(SFX_UI_HOVER)
+      sfx(SFX_UI_HOVER, 3)
       dpad_mode = "field"
       dpad_cursor[2] = 10
     end
@@ -327,18 +328,18 @@ function update_playing()
       local tool = tools[dpad_tool_index]
       local tool_type = type(tool) == "table" and tool.type or tool
       if tool_type == TOOL_RESET then
-        sfx(SFX_REMOVE_TOOL)
+        sfx(SFX_REMOVE_TOOL, 3)
         if current_state == STATE_LEVEL_EDIT then
           load_level(init_empty_level())
         else
           load_level(get_level(current_level))
         end
       elseif tool_type == TOOL_MENU then
-        sfx(SFX_UI_SELECT)
+        sfx(SFX_UI_SELECT, 3)
         current_state = STATE_MENU
         selected_menu_option = 1
       else
-        sfx(SFX_PLACE_TOOL)
+        sfx(SFX_PLACE_TOOL, 3)
         selected_tool = tool_type
       end
     end
@@ -373,14 +374,14 @@ function update_level_complete()
   if input.mode == "controller" then
     if input.up.just_pressed then
       selected_complete_option = 1
-      sfx(SFX_UI_HOVER)
+      sfx(SFX_UI_HOVER, 3)
     elseif input.down.just_pressed then
       selected_complete_option = 2
-      sfx(SFX_UI_HOVER)
+      sfx(SFX_UI_HOVER, 3)
     end
 
     if input.x.just_pressed then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       if selected_complete_option == 1 then
         if current_level == get_level_count() then
           current_state = STATE_WIN
@@ -410,7 +411,7 @@ function update_level_complete()
 
     if input.lmb.just_pressed then
       if continue_hover then
-        sfx(SFX_UI_SELECT)
+        sfx(SFX_UI_SELECT, 3)
         if current_level == get_level_count() then
           current_state = STATE_WIN
         else
@@ -422,7 +423,7 @@ function update_level_complete()
         end
         selected_complete_option = 1
       elseif replay_hover then
-        sfx(SFX_UI_SELECT)
+        sfx(SFX_UI_SELECT, 3)
         dpad_cursor = {5, 5}
         dpad_mode = "field"
         load_level(get_level(current_level))
@@ -435,7 +436,7 @@ end
 
 function update_win()
   if input.o.just_pressed then
-    sfx(SFX_UI_SELECT)
+    sfx(SFX_UI_SELECT, 3)
     field = {}
     targets = {}
     laser_plot = {}
@@ -447,7 +448,7 @@ function update_win()
   if input.lmb.just_pressed then
     local mx, my = unpack(input.cursor)
     if mx >= 44 and mx < 84 and my >= 66 and my < 74 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       field = {}
       targets = {}
       laser_plot = {}
@@ -475,7 +476,7 @@ end
 
 function update_instructions()
   if input.o.just_pressed then
-    sfx(SFX_UI_SELECT)
+    sfx(SFX_UI_SELECT, 3)
     current_state = STATE_MENU
     selected_menu_option = 1
   end
@@ -483,7 +484,7 @@ function update_instructions()
   if input.lmb.just_pressed then
     local mx, my = unpack(input.cursor)
     if mx >= 44 and mx < 84 and my >= 114 and my < 122 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       current_state = STATE_MENU
       selected_menu_option = 1
     end
@@ -492,7 +493,7 @@ end
 
 function update_menu()
   if input.up.just_pressed then
-    sfx(SFX_UI_HOVER)
+    sfx(SFX_UI_HOVER, 3)
     selected_menu_option = selected_menu_option - 1
     if selected_menu_option < 1 then
       selected_menu_option = 4
@@ -500,7 +501,7 @@ function update_menu()
   end
 
   if input.down.just_pressed then
-    sfx(SFX_UI_HOVER)
+    sfx(SFX_UI_HOVER, 3)
     selected_menu_option = selected_menu_option + 1
     if selected_menu_option > 4 then
       selected_menu_option = 1
@@ -509,22 +510,22 @@ function update_menu()
 
   if input.lmb.just_pressed or input.x.just_pressed or input.o.just_pressed then
     if selected_menu_option == 1 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       current_level = 1
       dpad_cursor = {5, 5}
       dpad_mode = "field"
       current_state = STATE_PLAYING
       load_level(get_level(current_level))
     elseif selected_menu_option == 2 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       preview_level = current_level
       load_level(get_level(preview_level))
       current_state = STATE_LEVEL_SELECT
     elseif selected_menu_option == 3 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       current_state = STATE_INSTRUCTIONS
     elseif selected_menu_option == 4 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       dpad_cursor = {5, 5}
       dpad_mode = "field"
       current_state = STATE_LEVEL_EDIT
@@ -541,7 +542,7 @@ function update_menu()
       local y = menu_y + (i - 1) * spacing
       if my >= y and my < y + 8 then
         if selected_menu_option != i then
-          sfx(SFX_UI_HOVER)
+          sfx(SFX_UI_HOVER, 3)
           selected_menu_option = i
         end
       end
@@ -557,7 +558,7 @@ function update_level_select()
 
   if input.left.just_pressed then
     if preview_level > 1 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_HOVER, 3)
       preview_level = preview_level - 1
       load_level(get_level(preview_level))
     end
@@ -565,14 +566,14 @@ function update_level_select()
 
   if input.right.just_pressed then
     if preview_level < get_level_count() then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_HOVER, 3)
       preview_level = preview_level + 1
       load_level(get_level(preview_level))
     end
   end
 
   if input.x.just_pressed then
-    sfx(SFX_UI_SELECT)
+    sfx(SFX_UI_SELECT, 3)
     current_level = preview_level
     dpad_cursor = {5, 5}
     dpad_mode = "field"
@@ -581,7 +582,7 @@ function update_level_select()
   end
 
   if input.o.just_pressed then
-    sfx(SFX_UI_SELECT)
+    sfx(SFX_UI_SELECT, 3)
     field = {}
     targets = {}
     laser_plot = {}
@@ -595,7 +596,7 @@ function update_level_select()
 
     if mx >= 4 and mx < 12 and my >= 60 and my < 68 then
       if preview_level > 1 then
-        sfx(SFX_UI_SELECT)
+        sfx(SFX_UI_HOVER, 3)
         preview_level = preview_level - 1
         load_level(get_level(preview_level))
       end
@@ -603,14 +604,14 @@ function update_level_select()
 
     if mx >= 116 and mx < 124 and my >= 60 and my < 68 then
       if preview_level < get_level_count() then
-        sfx(SFX_UI_SELECT)
+        sfx(SFX_UI_HOVER, 3)
         preview_level = preview_level + 1
         load_level(get_level(preview_level))
       end
     end
 
     if mx >= 88 and mx < 120 and my >= 114 and my < 122 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       current_level = preview_level
       dpad_cursor = {5, 5}
       dpad_mode = "field"
@@ -619,7 +620,7 @@ function update_level_select()
     end
 
     if mx >= 8 and mx < 40 and my >= 114 and my < 122 then
-      sfx(SFX_UI_SELECT)
+      sfx(SFX_UI_SELECT, 3)
       field = {}
       targets = {}
       laser_plot = {}
@@ -1278,7 +1279,7 @@ function toggle_cell(gx, gy)
   end
 
   if did_action then
-    sfx(SFX_PLACE_TOOL)
+    sfx(SFX_PLACE_TOOL, 3)
   end
 
   field[gy][gx] = new_cell
@@ -1335,7 +1336,7 @@ function clear_cell(gx, gy)
     end
   end
 
-  sfx(SFX_REMOVE_TOOL)
+  sfx(SFX_REMOVE_TOOL, 3)
   field[gy][gx] = EMPTY
 
   if current_state == STATE_PLAYING and is_tool(cell) then
@@ -1595,18 +1596,18 @@ function update_ui()
 
     if mx >= x and mx < x + T_SIZE and my >= y and my < y + T_SIZE then
       if tool_type == TOOL_RESET then
-        sfx(SFX_REMOVE_TOOL)
+        sfx(SFX_REMOVE_TOOL, 3)
         if current_state == STATE_LEVEL_EDIT then
           load_level(init_empty_level())
         else
           load_level(get_level(current_level))
         end
       elseif tool_type == TOOL_MENU then
-        sfx(SFX_UI_SELECT)
+        sfx(SFX_UI_SELECT, 3)
         current_state = STATE_MENU
         selected_menu_option = 1
       else
-        sfx(SFX_PLACE_TOOL)
+        sfx(SFX_PLACE_TOOL, 3)
         selected_tool = tool_type
       end
     end
@@ -1905,6 +1906,7 @@ levels = {
   }
 }
 
+
 __gfx__
 00000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000022222200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2161,11 +2163,12 @@ __map__
 0000000000000032001a00000000000000000000000000320032001a0000000000002900320000002e00000000000000002a320000001a00000000320000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001a0000001a003200002e00320000000032002a001a000032000000000000000000002d0032003200320000323200003200320000002a001a0000320000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-010300001d510265201d3001d300162001620022100221001c4000f0000d0000100014000130001d00012000245002000011000100000f0000e00000000000000000000000000000000000000000000000000000
-000300001a01021510260102a52000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000300001271000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000300000b73000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000500000f510145101951014520115101b5102051024510275102c51030520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300001d520265301d3001d300162001620022100221001c4000f0000d0000100014000130001d00012000245002000011000100000f0000e00000000000000000000000000000000000000000000000000000
+000300001a03021530260302a54000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300001273000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300000b74000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000500000f530145301953014540115301b5302053024530275302c53030540000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000400003264400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2176,17 +2179,20 @@ __sfx__
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-901500200c0433f6003f6143f60024655000003f614000003f6003f6140c0430000024645000003f614000000c043000003f61400000246453f6003f614000000c0003f6140c0430000024645000003f61400000
-001500201a0301a030230302303021030210301f0301f0001a0001a0001a0301a0301a0301a0301a030000001a0301a03023030230302103021030000001f0301c0301c0301c0301c0301c030000000000000000
-001500201c0301c0302403024030230302100021000210301e0301e0301e0301e0301e0301a000260302600026020200002600026030240302600024000210302303023030230302303000000000002300023030
-001500201a0301a030230302303021030210301f0301f0001a0001a0001a0301a0301a0301a0301a0301a0301a0301a030230302303021030210301f030210301c0301c0301c0301c0301c0301c0301a0301c030
-011500201c0301c030240302403023030210002100021030260302603026000260302603026030260002603028030280302600026030240302600021030210001f0301f0301f0301f0301f0301f0001f00000000
-001500000202002020020231300009020090200902300000020200202002023020000000000000020200202302020020200202300000090200902009023000000400004000040200402004023000000400004000
-00150000040200402004023000000c0200c0200c02307000060000600006020060200602306000060000600006000000000000000000000000000000000000000000000000000000000000000000000000000000
+901500200e0333f60032d343f600266250000032d34000003f60032d340e01300000266250000032d34000000e0130000032d3400000266253f60032d34000000c00032d340e01300000266250000032d3400000
+001500201a0101a010230102301021010210101f0101f0001a0001a0001a0101a0101a0101a0101a010000001a0101a01023010230102101021010000001f0101c0101c0101c0101c0101c010000000000000000
+001500201c0101c0102401024010230102100021000210101e0101e0101e0101e0101e0101a000260102600026010200002600026010240102600024000210102301023010230102301000000000002300023010
+001500201a0101a010230102301021010210101f0101f0001a0001a0001a0101a0101a0101a0101a0101a0101a0101a010230102301021010210101f010210101c0101c0101c0101c0101c0101c0101a0101c010
+001500201c0101c010240102401023010210002100021010260102601026000260102600026010260002601028010280102600026010240102600021010210001f0101f0101f0101f0101f0101f0001f00000000
+011500000202002020020231300009020090200902300000020200202002023020000200000000020200202302020020200202300000090200902009023000000400004000040200402004020040200402304000
+00150000040200402004023000000c0200c0200c02307000060000600006020060200602306000060000d0000e0200e023000000c020060200900009020000000702007020070200702007023000000000000000
+00150000040200402004023000000c0200c0200c023090200e0200e0200e0230e0200e0000e0200e0230c0231002010020100230e0200c0200e00009020090000702007020070200702007020070230700013000
+00150000000000000004003000000c0000c0000c00302000060000600006000060000200006000060000c0000200002000020000e0000c0000c0000c000090000700007000070000700002020020200202302000
 __music__
 00 10111544
 00 10121644
-00 10134344
-02 10144344
+00 10131544
+00 10141744
+02 10421844
+
 
