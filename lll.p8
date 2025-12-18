@@ -4,6 +4,9 @@ __lua__
 
 -- constants --
 
+CARTDATA_KEY = "lll_data_v1"
+DATA_IS_FIRST_RUN = 0
+
 EMPTY = ""
 T_SIZE = 8
 FIELD_SIZE = {10,10}
@@ -169,10 +172,11 @@ end
 function _init()
   poke(0x5f2d, 1)
   init_snowflakes()
-  if current_state == STATE_LEVEL_EDIT then
-    load_level(init_empty_level())
-  else
-    load_level(get_level(current_level))
+  cartdata(CARTDATA_KEY)
+  is_first_run = dget(DATA_IS_FIRST_RUN) != 1
+  if is_first_run then
+    dset(DATA_IS_FIRST_RUN, 1)
+    current_state = STATE_INSTRUCTIONS
   end
   music(0, 500)
 end
@@ -711,28 +715,28 @@ function draw_instructions()
 
   print("how to play", 38, 4, 12)
 
-  local y = 14
-  spr(TOOL_SPRITES[TOOL_TARGET], 8, y)
-  print("light: activate all with", 20, y+2, 7)
-  print("  the laser", 20, y+8, 7)
+  print("select and place tools to", 8, 14, 7)
+  print("direct lasers and turn on", 8, 20, 7)
+  print("all the lights", 8, 26, 7)
 
-  y = 32
-  spr(TOOL_SPRITES[TOOL_MIRROR], 8, y)
-  print("mirror: reflects", 20, y+2, 7)
-  print("  the laser", 20, y+8, 7)
+  local y = 38
+  spr(TOOL_SPRITES[TOOL_TARGET], 8, y)
+  print("light bulb: lights up", 20, y+2, 7)
 
   y = 50
+  spr(TOOL_SPRITES[TOOL_MIRROR], 8, y)
+  print("mirror: reflects laser", 20, y+2, 7)
+
+  y = 62
   spr(TOOL_SPRITES[TOOL_SPLIT], 8, y)
-  print("splitter: splits", 20, y+2, 7)
-  print("  the laser", 20, y+8, 7)
+  print("splitter: splits laser", 20, y+2, 7)
 
-  y = 68
+  y = 74
   spr(TOOL_SPRITES[TOOL_BLOCK], 8, y)
-  print("tree: blocks", 20, y+2, 7)
-  print("  the laser", 20, y+8, 7)
+  print("tree: blocks laser", 20, y+2, 7)
 
-  print("❎/click to place and rotate", 8, 86, 7)
-  print("🅾️/right-click to remove", 8, 98, 7)
+  print("❎/click to place and rotate", 8, 92, 7)
+  print("🅾️/right-click to remove", 8, 104, 7)
 
   if input.mode == "mouse" then
     local mx, my = unpack(input.cursor)
