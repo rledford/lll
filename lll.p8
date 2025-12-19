@@ -1,7 +1,7 @@
 pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
-
+	
 -- constants --
 
 CARTDATA_KEY = "lll_data_v1"
@@ -654,6 +654,8 @@ function draw_menu()
     local mx, my = unpack(input.cursor)
     spr(CURSOR_SPRITE, mx-1, my-1)
   end
+  print(" ♪", 14, 104, 10)
+  print("♪ 'jingle bits' by lunkik", 12, 110, 10)
 end
 
 function _draw()
@@ -716,8 +718,8 @@ function draw_instructions()
   print("how to play", 38, 4, 12)
 
   print("select and place tools to", 8, 14, 7)
-  print("direct lasers and turn on", 8, 20, 7)
-  print("all the lights", 8, 26, 7)
+  print("direct lasers and activate", 8, 20, 7)
+  print("all lights", 8, 26, 7)
 
   local y = 38
   spr(TOOL_SPRITES[TOOL_TARGET], 8, y)
@@ -2198,5 +2200,4 @@ __music__
 00 10131544
 00 10141744
 02 10421844
-
 
